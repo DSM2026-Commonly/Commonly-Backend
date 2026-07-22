@@ -1,7 +1,6 @@
 package commonly.commonlybe.global.error.exception;
 
 import commonly.commonlybe.global.error.error_code.ErrorProperty;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
