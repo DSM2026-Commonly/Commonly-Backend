@@ -38,8 +38,8 @@ public class GlobalExceptionFilter extends OncePerRequestFilter {
     }
 
     private ErrorResponse toErrorResponse(Exception e) {
-        if (e instanceof CommonlyException commonlyException)
-            return e.getMessage() != null ? ErrorResponse.from(commonlyException.getErrorProperty()) : ErrorResponse.of(commonlyException.getErrorProperty(), commonlyException.getMessage());
+        if (e instanceof CommonlyException ce)
+            return e.getMessage() != null ? ErrorResponse.of(ce.getErrorProperty(), ce.getMessage()) : ErrorResponse.from(ce.getErrorProperty());
         else
             return ErrorResponse.from(GlobalErrorCode.INTERNAL_SERVER_ERROR);
     }
