@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.config.annotation.SecurityConfigurer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,6 +21,6 @@ public class FilterConfig implements SecurityConfigurer<DefaultSecurityFilterCha
 
     @Override
     public void configure(HttpSecurity http) {
-        http.addFilterBefore(new GlobalExceptionFilter(objectMapper), GlobalExceptionFilter.class);
+        http.addFilterBefore(new GlobalExceptionFilter(objectMapper), SecurityContextHolderFilter.class);
     }
 }
