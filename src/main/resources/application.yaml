@@ -16,8 +16,6 @@ spring:
       hibernate:
         jdbc:
           batch_size: 100
-        order_inserts: true
-    open-in-view: false
 
   servlet:
     multipart:
