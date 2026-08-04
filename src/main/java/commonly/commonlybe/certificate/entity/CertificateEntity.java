@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,7 +26,7 @@ public class CertificateEntity {
     private String name;
 
     @Column(name = "birth_date")
-    private LocalDateTime birthDate;
+    private String birthDate;
 
     @Column(name = "gender", length = 1, nullable = false)
     private String gender;
@@ -39,31 +38,31 @@ public class CertificateEntity {
     private String keyResponsibilities;
 
     @Column(name = "hire_date")
-    private LocalDateTime hireDate;
+    private String hireDate;
 
     @Column(name = "expiration_date")
-    private LocalDateTime expirationDate;
+    private String expirationDate;
 
     @Column(name = "retirement_date")
-    private LocalDateTime retirementDate;
+    private String retirementDate;
 
     @Column(name = "division")
-    private Division division;
+    private String division;
 
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
 
     @Column(name = "employment_type")
-    private EmploymentType employmentType;
+    private String employmentType;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
     @Builder
-    public CertificateEntity(String name, LocalDateTime birthDate, String gender, String jobTitle,
-                              String keyResponsibilities, LocalDateTime hireDate, LocalDateTime expirationDate,
-                              LocalDateTime retirementDate, Division division, String reason,
-                              EmploymentType employmentType, String note) {
+    public CertificateEntity(String name, String birthDate, String gender, String jobTitle,
+                              String keyResponsibilities, String hireDate, String expirationDate,
+                              String retirementDate, String division, String reason,
+                              String employmentType, String note) {
         this.name = name;
         this.birthDate = birthDate;
         this.gender = gender;
