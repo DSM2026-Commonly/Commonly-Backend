@@ -1,0 +1,63 @@
+package commonly.commonlybe.global.s3;
+
+import commonly.commonlybe.global.error.error_code.FileErrorCode;
+import commonly.commonlybe.global.error.exception.CommonlyException;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
+@Component
+@RequiredArgsConstructor
+public class S3Uploader {
+
+    private static final DateTimeFormatter KEY_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+
+    private final S3Client s3Client;
+
+    @Value("${app.s3.bucket}")
+    private String bucket;
+
+    public String upload(MultipartFile file) {
+        String key = generateKey(file.getOriginalFilename());
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder().bucket(bucket).key(key).contentType(file.getContentType()).build(),
+                    RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+        } catch (IOException | SdkException e) {
+            throw new CommonlyException(FileErrorCode.STORAGE_FAILURE);
+        }
+        return key;
+    }
+
+    public byte[] download(String key) {
+        try {
+            return s3Client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build())
+                    .asByteArray();
+        } catch (SdkException e) {
+            throw new CommonlyException(FileErrorCode.STORAGE_FAILURE);
+        }
+    }
+
+    private String generateKey(String originalFilename) {
+        String datePrefix = KEY_DATE_FORMATTER.format(LocalDate.now());
+        return "uploads/certificates/%s/%s%s".formatted(datePrefix, UUID.randomUUID(), extractExtension(originalFilename));
+    }
+
+    private String extractExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return "";
+        }
+        int dotIndex = originalFilename.lastIndexOf('.');
+        return dotIndex == -1 ? "" : originalFilename.substring(dotIndex);
+    }
+}
