@@ -1,3 +1,33 @@
 spring:
   application:
     name: Commonly-be
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:commonly}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # ponytail: 마이그레이션 툴(Flyway) 미도입 상태의 임시 스키마 관리. 운영 반영 전 Flyway로 교체
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+    open-in-view: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+app:
+  s3:
+    bucket: ${S3_BUCKET:commonly-files}
+    region: ${AWS_REGION:ap-northeast-2}
+    endpoint: ${S3_ENDPOINT:}
+  file:
+    max-rows: 10000
