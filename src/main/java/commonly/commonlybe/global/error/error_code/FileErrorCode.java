@@ -11,6 +11,10 @@ public enum FileErrorCode implements ErrorProperty {
     INVALID_HEADER_ROW(HttpStatus.UNPROCESSABLE_CONTENT, "1행에서 헤더를 찾을 수 없습니다. 제공된 표준 서식을 사용해 주세요."),
     UNPROCESSABLE_FILE(HttpStatus.UNPROCESSABLE_CONTENT, "파일을 분석할 수 없습니다. 빈 파일이거나 시트가 없습니다."),
     ROW_COUNT_EXCEEDED(HttpStatus.UNPROCESSABLE_CONTENT, "허용된 최대 행 수를 초과했습니다."),
+    FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다."),
+    SOURCE_COLUMN_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 열입니다."),
+    TARGET_FIELD_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 필드입니다."),
+    REQUIRED_FIELD_NOT_MAPPED(HttpStatus.BAD_REQUEST, "필수 필드가 매핑되지 않았습니다."),
     STORAGE_FAILURE(HttpStatus.BAD_GATEWAY, "파일 저장소 처리 중 오류가 발생했습니다.");
 
     private final HttpStatus status;
