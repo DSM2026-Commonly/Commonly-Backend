@@ -10,7 +10,6 @@ spring:
 
   jpa:
     hibernate:
-      # ponytail: 마이그레이션 툴(Flyway) 미도입 상태의 임시 스키마 관리. 운영 반영 전 Flyway로 교체
       ddl-auto: update
     properties:
       hibernate:
