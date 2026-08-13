@@ -20,7 +20,9 @@ public class S3Config {
     public S3Client s3Client() {
         var builder = S3Client.builder().region(Region.of(region));
         if (endpoint != null && !endpoint.isBlank()) {
-            builder.endpointOverride(URI.create(endpoint));
+            // 로컬 S3 대체 구현(LocalStack 등)은 가상 호스트 방식(bucket.host)을 해석하지 못한다.
+            // 엔드포인트를 재정의하는 경우에만 path-style을 강제하고, 실제 AWS에서는 기본값을 유지한다.
+            builder.endpointOverride(URI.create(endpoint)).forcePathStyle(true);
         }
         return builder.build();
     }
