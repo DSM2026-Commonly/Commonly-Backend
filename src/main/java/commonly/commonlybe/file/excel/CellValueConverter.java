@@ -41,15 +41,4 @@ public final class CellValueConverter {
     private static LocalDate correctTwoDigitYear(LocalDate date) {
         return date.isAfter(LocalDate.now()) ? date.minusYears(100) : date;
     }
-
-    public static String parseGender(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        return switch (raw.trim()) {
-            case "남", "남자", "M", "m" -> "M";
-            case "여", "여자", "F", "f" -> "F";
-            default -> null;
-        };
-    }
 }

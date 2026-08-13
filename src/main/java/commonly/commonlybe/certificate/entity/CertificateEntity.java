@@ -28,7 +28,7 @@ public class CertificateEntity {
     @Column(name = "birth_date")
     private String birthDate;
 
-    @Column(name = "gender", length = 1, nullable = false)
+    @Column(name = "gender")
     private String gender;
 
     @Column(name = "job_title")

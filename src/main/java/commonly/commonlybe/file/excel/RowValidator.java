@@ -24,12 +24,6 @@ public final class RowValidator {
             return RowResult.failure("성명이 비어 있습니다");
         }
 
-        String rawGender = fieldValues.get("gender");
-        String gender = CellValueConverter.parseGender(rawGender);
-        if (gender == null) {
-            return RowResult.failure("성별 값 '%s'을 판정할 수 없습니다".formatted(rawGender));
-        }
-
         String division = normalize(fieldValues.get("division"));
         if (division != null && !VALID_DIVISIONS.contains(division)) {
             return RowResult.failure("구분 값 '%s'은 허용되지 않습니다 (채용/전보/해지/퇴직)".formatted(division));
@@ -61,7 +55,7 @@ public final class RowValidator {
         CertificateEntity certificate = CertificateEntity.builder()
                 .name(name)
                 .birthDate(trimToNull(fieldValues.get("birthDate")))
-                .gender(gender)
+                .gender(trimToNull(fieldValues.get("gender")))
                 .jobTitle(trimToNull(fieldValues.get("jobTitle")))
                 .keyResponsibilities(trimToNull(fieldValues.get("keyResponsibilities")))
                 .hireDate(hireDateRaw)
