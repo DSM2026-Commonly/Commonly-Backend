@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,6 +17,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class S3Uploader {
@@ -34,6 +36,7 @@ public class S3Uploader {
                     PutObjectRequest.builder().bucket(bucket).key(key).contentType(file.getContentType()).build(),
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         } catch (IOException | SdkException e) {
+            log.error("S3 업로드 실패 : bucket={}, key={}", bucket, key, e);
             throw new CommonlyException(FileErrorCode.STORAGE_FAILURE);
         }
         return key;
@@ -44,6 +47,7 @@ public class S3Uploader {
             return s3Client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build())
                     .asByteArray();
         } catch (SdkException e) {
+            log.error("S3 다운로드 실패 : bucket={}, key={}", bucket, key, e);
             throw new CommonlyException(FileErrorCode.STORAGE_FAILURE);
         }
     }
