@@ -31,6 +31,4 @@ jobs:
           script: |
             set -eu
             cd "${{ secrets.DEPLOY_PATH || '/home/ubuntu/commonly-be' }}"
-            git pull --ff-only origin develop
-            docker compose --env-file .env up -d --build --remove-orphans
-            docker compose ps
+            ./deploy.sh
