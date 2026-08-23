@@ -14,9 +14,9 @@ import commonly.commonlybe.file.excel.ParsedExcel;
 import commonly.commonlybe.file.excel.ParsedRow;
 import commonly.commonlybe.file.excel.RowResult;
 import commonly.commonlybe.file.excel.RowValidator;
+import commonly.commonlybe.file.exception.FileException;
 import commonly.commonlybe.file.repository.FileRepository;
 import commonly.commonlybe.global.error.error_code.FileErrorCode;
-import commonly.commonlybe.global.error.exception.CommonlyException;
 import commonly.commonlybe.global.s3.S3Uploader;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -39,7 +39,7 @@ public class MappingConfirmService {
 
     public MappingConfirmResponse confirm(Long fileId, MappingConfirmRequest request) {
         FileEntity fileEntity = fileRepository.findById(fileId)
-                .orElseThrow(() -> new CommonlyException(FileErrorCode.FILE_NOT_FOUND));
+                .orElseThrow(() -> new FileException(FileErrorCode.FILE_NOT_FOUND));
 
         ParsedExcel parsedExcel = downloadAndParse(fileEntity.getFilePath());
         Map<String, Integer> columnIndex = buildColumnIndex(parsedExcel.headers());
@@ -83,18 +83,18 @@ public class MappingConfirmService {
         Set<String> mappedTargetFields = new HashSet<>();
         for (ColumnMapping mapping : mappings) {
             if (!availableColumns.contains(mapping.sourceColumn())) {
-                throw new CommonlyException(FileErrorCode.SOURCE_COLUMN_NOT_FOUND,
+                throw new FileException(FileErrorCode.SOURCE_COLUMN_NOT_FOUND,
                         "존재하지 않는 열입니다: '%s'".formatted(mapping.sourceColumn()));
             }
             if (!ColumnMappingTable.isValidTargetField(mapping.targetField())) {
-                throw new CommonlyException(FileErrorCode.TARGET_FIELD_NOT_FOUND,
+                throw new FileException(FileErrorCode.TARGET_FIELD_NOT_FOUND,
                         "존재하지 않는 필드입니다: '%s'".formatted(mapping.targetField()));
             }
             mappedTargetFields.add(mapping.targetField());
         }
         for (String required : ColumnMappingTable.requiredTargetFields()) {
             if (!mappedTargetFields.contains(required)) {
-                throw new CommonlyException(FileErrorCode.REQUIRED_FIELD_NOT_MAPPED,
+                throw new FileException(FileErrorCode.REQUIRED_FIELD_NOT_MAPPED,
                         "필수 필드가 매핑되지 않았습니다: '%s'".formatted(required));
             }
         }

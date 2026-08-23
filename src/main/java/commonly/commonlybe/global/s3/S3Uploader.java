@@ -1,7 +1,7 @@
 package commonly.commonlybe.global.s3;
 
+import commonly.commonlybe.file.exception.FileException;
 import commonly.commonlybe.global.error.error_code.FileErrorCode;
-import commonly.commonlybe.global.error.exception.CommonlyException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -37,7 +37,7 @@ public class S3Uploader {
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         } catch (IOException | SdkException e) {
             log.error("S3 업로드 실패 : bucket={}, key={}", bucket, key, e);
-            throw new CommonlyException(FileErrorCode.STORAGE_FAILURE);
+            throw new FileException(FileErrorCode.STORAGE_FAILURE);
         }
         return key;
     }
@@ -48,7 +48,7 @@ public class S3Uploader {
                     .asByteArray();
         } catch (SdkException e) {
             log.error("S3 다운로드 실패 : bucket={}, key={}", bucket, key, e);
-            throw new CommonlyException(FileErrorCode.STORAGE_FAILURE);
+            throw new FileException(FileErrorCode.STORAGE_FAILURE);
         }
     }
 

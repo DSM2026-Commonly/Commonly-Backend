@@ -1,7 +1,7 @@
 package commonly.commonlybe.file;
 
+import commonly.commonlybe.file.exception.FileException;
 import commonly.commonlybe.global.error.error_code.FileErrorCode;
-import commonly.commonlybe.global.error.exception.CommonlyException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -18,10 +18,10 @@ public final class FileValidator {
     public static void validate(MultipartFile file) {
         String filename = file.getOriginalFilename();
         if (filename == null || !filename.toLowerCase().endsWith(REQUIRED_EXTENSION)) {
-            throw new CommonlyException(FileErrorCode.UNSUPPORTED_FILE_TYPE);
+            throw new FileException(FileErrorCode.UNSUPPORTED_FILE_TYPE);
         }
         if (!hasZipSignature(file)) {
-            throw new CommonlyException(FileErrorCode.UNSUPPORTED_FILE_TYPE);
+            throw new FileException(FileErrorCode.UNSUPPORTED_FILE_TYPE);
         }
     }
 

@@ -1,7 +1,7 @@
 package commonly.commonlybe.file.excel;
 
+import commonly.commonlybe.file.exception.FileException;
 import commonly.commonlybe.global.error.error_code.FileErrorCode;
-import commonly.commonlybe.global.error.exception.CommonlyException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -23,16 +23,16 @@ public final class ExcelParser {
     public static ParsedExcel parse(InputStream inputStream) {
         try (Workbook workbook = new XSSFWorkbook(inputStream)) {
             if (workbook.getNumberOfSheets() == 0) {
-                throw new CommonlyException(FileErrorCode.UNPROCESSABLE_FILE);
+                throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
             }
             Sheet sheet = workbook.getSheetAt(0);
 
             int firstNonEmptyRow = findFirstNonEmptyRow(sheet);
             if (firstNonEmptyRow == -1) {
-                throw new CommonlyException(FileErrorCode.UNPROCESSABLE_FILE);
+                throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
             }
             if (firstNonEmptyRow != 0) {
-                throw new CommonlyException(FileErrorCode.INVALID_HEADER_ROW,
+                throw new FileException(FileErrorCode.INVALID_HEADER_ROW,
                         "1행에서 헤더를 찾을 수 없습니다. 데이터가 있는 첫 번째 행: %d행".formatted(firstNonEmptyRow + 1));
             }
 
@@ -51,7 +51,7 @@ public final class ExcelParser {
 
             return new ParsedExcel(headers, rows);
         } catch (IOException e) {
-            throw new CommonlyException(FileErrorCode.UNPROCESSABLE_FILE);
+            throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
         }
     }
 

@@ -7,9 +7,9 @@ import commonly.commonlybe.file.entity.FileEntity;
 import commonly.commonlybe.file.excel.ExcelParser;
 import commonly.commonlybe.file.excel.HeaderNormalizer;
 import commonly.commonlybe.file.excel.ParsedExcel;
+import commonly.commonlybe.file.exception.FileException;
 import commonly.commonlybe.file.repository.FileRepository;
 import commonly.commonlybe.global.error.error_code.FileErrorCode;
-import commonly.commonlybe.global.error.exception.CommonlyException;
 import commonly.commonlybe.global.s3.S3Uploader;
 import java.io.IOException;
 import java.util.List;
@@ -41,7 +41,7 @@ public class FileUploadService {
 
         ParsedExcel parsedExcel = parseExcel(file);
         if (parsedExcel.rows().size() > maxRows) {
-            throw new CommonlyException(FileErrorCode.ROW_COUNT_EXCEEDED);
+            throw new FileException(FileErrorCode.ROW_COUNT_EXCEEDED);
         }
 
         List<String> columns = parsedExcel.headers().stream()
@@ -58,7 +58,7 @@ public class FileUploadService {
         try {
             return ExcelParser.parse(file.getInputStream());
         } catch (IOException e) {
-            throw new CommonlyException(FileErrorCode.UNPROCESSABLE_FILE);
+            throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
         }
     }
 
