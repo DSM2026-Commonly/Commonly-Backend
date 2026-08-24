@@ -35,6 +35,12 @@ public final class RowValidator {
                     "근무형태 값 '%s'은 허용되지 않습니다 (기간제/단시간근로자)".formatted(employmentType));
         }
 
+        String birthDateRaw = trimToNull(fieldValues.get("birthDate"));
+        LocalDate birthDate = CellValueConverter.parseDate(birthDateRaw);
+        if (birthDateRaw != null && birthDate == null) {
+            return RowResult.failure("생년월일 값 '%s'의 날짜 형식을 인식할 수 없습니다".formatted(birthDateRaw));
+        }
+
         String hireDateRaw = trimToNull(fieldValues.get("hireDate"));
         String expirationDateRaw = trimToNull(fieldValues.get("expirationDate"));
         String retirementDateRaw = trimToNull(fieldValues.get("retirementDate"));
@@ -54,7 +60,7 @@ public final class RowValidator {
 
         CertificateEntity certificate = CertificateEntity.builder()
                 .name(name)
-                .birthDate(trimToNull(fieldValues.get("birthDate")))
+                .birthDate(birthDate)
                 .gender(trimToNull(fieldValues.get("gender")))
                 .jobTitle(trimToNull(fieldValues.get("jobTitle")))
                 .keyResponsibilities(trimToNull(fieldValues.get("keyResponsibilities")))

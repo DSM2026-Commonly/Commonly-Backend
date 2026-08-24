@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
+import java.time.LocalDate;
 import lombok.NoArgsConstructor;
 
 @Entity
@@ -26,7 +27,7 @@ public class CertificateEntity {
     private String name;
 
     @Column(name = "birth_date")
-    private String birthDate;
+    private LocalDate birthDate;
 
     @Column(name = "gender")
     private String gender;
@@ -59,7 +60,7 @@ public class CertificateEntity {
     private String note;
 
     @Builder
-    public CertificateEntity(String name, String birthDate, String gender, String jobTitle,
+    public CertificateEntity(String name, LocalDate birthDate, String gender, String jobTitle,
                               String keyResponsibilities, String hireDate, String expirationDate,
                               String retirementDate, String division, String reason,
                               String employmentType, String note) {
