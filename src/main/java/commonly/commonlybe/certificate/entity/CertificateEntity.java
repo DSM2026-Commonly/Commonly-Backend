@@ -2,6 +2,8 @@ package commonly.commonlybe.certificate.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -29,8 +31,9 @@ public class CertificateEntity {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "gender")
-    private String gender;
+    private Gender gender;
 
     @Column(name = "job_title")
     private String jobTitle;
@@ -60,7 +63,7 @@ public class CertificateEntity {
     private String note;
 
     @Builder
-    public CertificateEntity(String name, LocalDate birthDate, String gender, String jobTitle,
+    public CertificateEntity(String name, LocalDate birthDate, Gender gender, String jobTitle,
                               String keyResponsibilities, String hireDate, String expirationDate,
                               String retirementDate, String division, String reason,
                               String employmentType, String note) {

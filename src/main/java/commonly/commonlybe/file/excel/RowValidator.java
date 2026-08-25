@@ -1,6 +1,7 @@
 package commonly.commonlybe.file.excel;
 
 import commonly.commonlybe.certificate.entity.CertificateEntity;
+import commonly.commonlybe.certificate.entity.Gender;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.Map;
@@ -22,6 +23,11 @@ public final class RowValidator {
         String name = trimToNull(fieldValues.get("name"));
         if (name == null) {
             return RowResult.failure("성명이 비어 있습니다");
+        }
+
+        Gender gender = Gender.from(normalize(fieldValues.get("gender")));
+        if (gender == null) {
+            return RowResult.failure("성별 값을 인식할 수 없습니다 (남/여)");
         }
 
         String division = normalize(fieldValues.get("division"));
@@ -61,7 +67,7 @@ public final class RowValidator {
         CertificateEntity certificate = CertificateEntity.builder()
                 .name(name)
                 .birthDate(birthDate)
-                .gender(trimToNull(fieldValues.get("gender")))
+                .gender(gender)
                 .jobTitle(trimToNull(fieldValues.get("jobTitle")))
                 .keyResponsibilities(trimToNull(fieldValues.get("keyResponsibilities")))
                 .hireDate(hireDateRaw)
