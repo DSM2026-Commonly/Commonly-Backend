@@ -33,4 +33,12 @@ public class Petitioner {
         this.phoneNumber = phoneNumber;
         this.birthDate = birthDate;
     }
+
+    public void updatePhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public void updateBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
 }

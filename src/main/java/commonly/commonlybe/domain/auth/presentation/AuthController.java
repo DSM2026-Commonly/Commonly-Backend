@@ -3,13 +3,17 @@ package commonly.commonlybe.domain.auth.presentation;
 import commonly.commonlybe.domain.auth.presentation.dto.request.ChangePasswordRequest;
 import commonly.commonlybe.domain.auth.presentation.dto.request.LoginRequest;
 import commonly.commonlybe.domain.auth.presentation.dto.request.SignupRequest;
+import commonly.commonlybe.domain.auth.presentation.dto.request.UpdateAccountRequest;
 import commonly.commonlybe.domain.auth.presentation.dto.response.TokenResponse;
 import commonly.commonlybe.domain.auth.service.ChangePasswordService;
 import commonly.commonlybe.domain.auth.service.LoginService;
 import commonly.commonlybe.domain.auth.service.SignupService;
+import commonly.commonlybe.domain.auth.service.UpdateAccountService;
+import commonly.commonlybe.global.security.auth.AuthDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +29,7 @@ public class AuthController {
     private final LoginService loginService;
     private final SignupService signupService;
     private final ChangePasswordService changePasswordService;
+    private final UpdateAccountService updateAccountService;
 
     @PostMapping("/login")
     public TokenResponse login(@RequestBody @Valid LoginRequest request) {
@@ -40,5 +45,12 @@ public class AuthController {
     @PatchMapping("/password/{userId}")
     public void changePassword(@PathVariable Long userId, @RequestBody @Valid ChangePasswordRequest request) {
         changePasswordService.execute(userId, request);
+    }
+
+    @PatchMapping("/{userId}")
+    public void updateAccount(@AuthenticationPrincipal AuthDetails authDetails,
+                              @PathVariable Long userId,
+                              @RequestBody @Valid UpdateAccountRequest request) {
+        updateAccountService.execute(authDetails.user().getId(), userId, request);
     }
 }
