@@ -3,6 +3,7 @@ package commonly.commonlybe.domain.auth.service;
 import commonly.commonlybe.domain.auth.presentation.dto.request.ChangePasswordRequest;
 import commonly.commonlybe.domain.user.domain.User;
 import commonly.commonlybe.domain.user.domain.repository.UserRepository;
+import commonly.commonlybe.domain.user.exception.ForbiddenUserException;
 import commonly.commonlybe.domain.user.exception.PasswordMismatchException;
 import commonly.commonlybe.domain.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,11 @@ public class ChangePasswordService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public void execute(Long userId, ChangePasswordRequest request) {
+    public void execute(Long currentUserId, Long userId, ChangePasswordRequest request) {
+        if (!currentUserId.equals(userId)) {
+            throw new ForbiddenUserException();
+        }
+
         User user = userRepository.findById(userId)
             .orElseThrow(UserNotFoundException::new);
 

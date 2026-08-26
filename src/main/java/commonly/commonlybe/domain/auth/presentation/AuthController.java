@@ -43,8 +43,10 @@ public class AuthController {
     }
 
     @PatchMapping("/password/{userId}")
-    public void changePassword(@PathVariable Long userId, @RequestBody @Valid ChangePasswordRequest request) {
-        changePasswordService.execute(userId, request);
+    public void changePassword(@AuthenticationPrincipal AuthDetails authDetails,
+                               @PathVariable Long userId,
+                               @RequestBody @Valid ChangePasswordRequest request) {
+        changePasswordService.execute(authDetails.user().getId(), userId, request);
     }
 
     @PatchMapping("/{userId}")
