@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auths/login", "/api/auths/signup").permitAll()
                 .requestMatchers("/api/admin/password").hasAnyAuthority("ADMIN", "USER")
                 .requestMatchers("/api/admin/**", "/api/admins").hasAuthority("ADMIN")
+                .requestMatchers("/api/issuance-histories").hasAnyAuthority("ADMIN", "USER")
                 .anyRequest().authenticated()
             )
             .with(filterConfig, Customizer.withDefaults());
