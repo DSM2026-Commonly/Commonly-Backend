@@ -6,6 +6,7 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -16,11 +17,6 @@ spring:
       hibernate:
         jdbc:
           batch_size: 100
-
-  security:
-    user:
-      name: ${SECURITY_USER:admin}
-      password: ${SECURITY_PASSWORD}
 
   servlet:
     multipart:
@@ -35,6 +31,19 @@ logging:
     root: ${LOG_LEVEL_ROOT:INFO}
     commonly.commonlybe: ${LOG_LEVEL_APP:INFO}
 
+jwt:
+  secret: ${JWT_SECRET}
+  header: ${JWT_HEADER:Authorization}
+  prefix: ${JWT_PREFIX:Bearer}
+  access-exp: ${JWT_ACCESS_EXP:3600}
+
+garage:
+  endpoint: ${GARAGE_ENDPOINT:http://garage:3900}
+  region: ${GARAGE_REGION:garage}
+  bucket: ${GARAGE_BUCKET:commonly}
+  access-key: ${GARAGE_ACCESS_KEY:}
+  secret-key: ${GARAGE_SECRET_KEY:}
+
 app:
   s3:
     bucket: ${S3_BUCKET:commonly-files}
@@ -42,4 +51,3 @@ app:
     endpoint: ${S3_ENDPOINT:}
   file:
     max-rows: 10000
-

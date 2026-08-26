@@ -8,6 +8,10 @@ group = 'commonly'
 version = '0.0.1-SNAPSHOT'
 description = 'Commonly-be'
 
+ext {
+    jjwtVersion = '0.13.0'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -26,12 +30,16 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'jakarta.validation:jakarta.validation-api'
+    implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation platform('software.amazon.awssdk:bom:2.46.7')
     implementation 'software.amazon.awssdk:s3'
-    testImplementation 'org.springframework.security:spring-security-test'
     annotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
     runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'com.h2database:h2'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
