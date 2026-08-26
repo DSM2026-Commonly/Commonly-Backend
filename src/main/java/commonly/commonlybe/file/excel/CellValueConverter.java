@@ -1,10 +1,13 @@
 package commonly.commonlybe.file.excel;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
+@RequiredArgsConstructor
 public final class CellValueConverter {
 
     private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
@@ -16,9 +19,6 @@ public final class CellValueConverter {
             DateTimeFormatter.ofPattern("yy.MM.dd"),
             DateTimeFormatter.ofPattern("yyyy년 M월 d일")
     );
-
-    private CellValueConverter() {
-    }
 
     /**
      * 지원 패턴으로 파싱을 시도한다. 실패하면 null을 반환한다(호출자가 실패 사유를 구성).
