@@ -1,7 +1,7 @@
 package commonly.commonlybe.domain.admin.service;
 
+import commonly.commonlybe.domain.admin.domain.Admin;
 import commonly.commonlybe.domain.admin.domain.repository.AdminRepository;
-import commonly.commonlybe.domain.user.domain.User;
 import commonly.commonlybe.domain.user.domain.repository.UserRepository;
 import commonly.commonlybe.domain.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +16,10 @@ public class DeleteUserService {
 
     @Transactional
     public void execute(Long userId) {
-        User user = userRepository.findById(userId)
+        Admin admin = adminRepository.findById(userId)
             .orElseThrow(UserNotFoundException::new);
 
-        adminRepository.findById(userId).ifPresent(adminRepository::delete);
-        userRepository.delete(user);
+        adminRepository.delete(admin);
+        userRepository.delete(admin.getUser());
     }
 }
