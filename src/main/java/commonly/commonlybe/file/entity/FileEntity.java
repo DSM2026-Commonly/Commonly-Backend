@@ -36,6 +36,9 @@ public class FileEntity {
     @Column(name = "file_size")
     private Long fileSize;
 
+    @Column(name = "confirmed", nullable = false)
+    private boolean confirmed;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
