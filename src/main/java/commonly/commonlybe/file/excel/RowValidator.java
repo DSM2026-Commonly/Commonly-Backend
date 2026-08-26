@@ -1,16 +1,22 @@
 package commonly.commonlybe.file.excel;
 
+import commonly.commonlybe.certificate.entity.CertificateCodes;
 import commonly.commonlybe.certificate.entity.CertificateEntity;
 import commonly.commonlybe.certificate.entity.Gender;
 import java.text.Normalizer;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public final class RowValidator {
 
-    private static final Set<String> VALID_DIVISIONS = Set.of("채용", "전보", "해지", "퇴직");
-    private static final Set<String> VALID_EMPLOYMENT_TYPES = Set.of("기간제", "단시간근로자");
+    /** 날짜로 저장되는 필드와 실패 메시지에 쓸 이름. 순서 고정(실패 메시지가 매번 같아야 한다). */
+    private static final List<Map.Entry<String, String>> DATE_FIELDS = List.of(
+            Map.entry("birthDate", "생년월일"),
+            Map.entry("hireDate", "채용일"),
+            Map.entry("expirationDate", "만료예정일"),
+            Map.entry("retirementDate", "퇴직일"));
 
     private RowValidator() {
     }
@@ -31,35 +37,36 @@ public final class RowValidator {
         }
 
         String division = normalize(fieldValues.get("division"));
-        if (division != null && !VALID_DIVISIONS.contains(division)) {
+        if (division != null && !CertificateCodes.VALID_DIVISIONS.contains(division)) {
             return RowResult.failure("구분 값 '%s'은 허용되지 않습니다 (채용/전보/해지/퇴직)".formatted(division));
         }
 
         String employmentType = normalize(fieldValues.get("employmentType"));
-        if (employmentType != null && !VALID_EMPLOYMENT_TYPES.contains(employmentType)) {
+        if (employmentType != null && !CertificateCodes.VALID_EMPLOYMENT_TYPES.contains(employmentType)) {
             return RowResult.failure(
                     "근무형태 값 '%s'은 허용되지 않습니다 (기간제/단시간근로자)".formatted(employmentType));
         }
 
-        String birthDateRaw = trimToNull(fieldValues.get("birthDate"));
-        LocalDate birthDate = CellValueConverter.parseDate(birthDateRaw);
-        if (birthDateRaw != null && birthDate == null) {
-            return RowResult.failure("생년월일 값 '%s'의 날짜 형식을 인식할 수 없습니다".formatted(birthDateRaw));
+        Map<String, LocalDate> dates = new HashMap<>();
+        for (Map.Entry<String, String> dateField : DATE_FIELDS) {
+            String raw = trimToNull(fieldValues.get(dateField.getKey()));
+            LocalDate parsed = CellValueConverter.parseDate(raw);
+            if (raw != null && parsed == null) {
+                return RowResult.failure(
+                        "%s 값 '%s'의 날짜 형식을 인식할 수 없습니다".formatted(dateField.getValue(), raw));
+            }
+            dates.put(dateField.getKey(), parsed);
         }
-
-        String hireDateRaw = trimToNull(fieldValues.get("hireDate"));
-        String expirationDateRaw = trimToNull(fieldValues.get("expirationDate"));
-        String retirementDateRaw = trimToNull(fieldValues.get("retirementDate"));
 
         CertificateEntity certificate = CertificateEntity.builder()
                 .name(name)
-                .birthDate(birthDate)
+                .birthDate(dates.get("birthDate"))
                 .gender(gender)
                 .jobTitle(trimToNull(fieldValues.get("jobTitle")))
                 .keyResponsibilities(trimToNull(fieldValues.get("keyResponsibilities")))
-                .hireDate(hireDateRaw)
-                .expirationDate(expirationDateRaw)
-                .retirementDate(retirementDateRaw)
+                .hireDate(dates.get("hireDate"))
+                .expirationDate(dates.get("expirationDate"))
+                .retirementDate(dates.get("retirementDate"))
                 .division(division)
                 .reason(trimToNull(fieldValues.get("reason")))
                 .employmentType(employmentType)
