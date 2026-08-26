@@ -1,6 +1,7 @@
 spring:
   application:
     name: Commonly-be
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -10,6 +11,16 @@ spring:
   jpa:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
+    open-in-view: false
+    show-sql: ${JPA_SHOW_SQL:false}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    commonly.commonlybe: ${LOG_LEVEL_APP:INFO}
 
 jwt:
   secret: ${JWT_SECRET}
