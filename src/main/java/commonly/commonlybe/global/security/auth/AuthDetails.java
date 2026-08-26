@@ -9,11 +9,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
-public record AuthDetails(User user) implements UserDetails {
+public record AuthDetails(User user, String authority) implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singletonList(new SimpleGrantedAuthority(user.getAuthority().name()));
+        return Collections.singletonList(new SimpleGrantedAuthority(authority));
     }
 
     @Override

@@ -4,7 +4,6 @@ import commonly.commonlybe.domain.auth.presentation.dto.request.SignupRequest;
 import commonly.commonlybe.domain.auth.presentation.dto.response.TokenResponse;
 import commonly.commonlybe.domain.petitioner.domain.Petitioner;
 import commonly.commonlybe.domain.petitioner.domain.repository.PetitionerRepository;
-import commonly.commonlybe.domain.user.domain.Authority;
 import commonly.commonlybe.domain.user.domain.User;
 import commonly.commonlybe.domain.user.domain.repository.UserRepository;
 import commonly.commonlybe.domain.user.exception.UserAlreadyExistsException;
@@ -33,7 +32,6 @@ public class SignupService {
                 .accountId(request.getAccountId())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
-                .authority(Authority.PETITIONER)
                 .build()
         );
 

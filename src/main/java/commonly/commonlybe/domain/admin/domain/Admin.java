@@ -22,9 +22,14 @@ public class Admin {
     @Column(nullable = false, length = 30)
     private String department;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private AdminRole role;
+
     @Builder
-    public Admin(User user, String department) {
+    public Admin(User user, String department, AdminRole role) {
         this.user = user;
         this.department = department;
+        this.role = role;
     }
 }

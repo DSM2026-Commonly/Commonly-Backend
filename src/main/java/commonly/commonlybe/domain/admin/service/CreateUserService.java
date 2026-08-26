@@ -1,9 +1,9 @@
 package commonly.commonlybe.domain.admin.service;
 
 import commonly.commonlybe.domain.admin.domain.Admin;
+import commonly.commonlybe.domain.admin.domain.AdminRole;
 import commonly.commonlybe.domain.admin.domain.repository.AdminRepository;
 import commonly.commonlybe.domain.admin.presentation.dto.request.CreateUserRequest;
-import commonly.commonlybe.domain.user.domain.Authority;
 import commonly.commonlybe.domain.user.domain.User;
 import commonly.commonlybe.domain.user.domain.repository.UserRepository;
 import commonly.commonlybe.domain.user.exception.UserAlreadyExistsException;
@@ -32,7 +32,6 @@ public class CreateUserService {
                 .accountId(request.getAccountId())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
-                .authority(Authority.USER)
                 .build()
         );
 
@@ -40,6 +39,7 @@ public class CreateUserService {
             Admin.builder()
                 .user(user)
                 .department(DUMMY_DEPARTMENT)
+                .role(AdminRole.USER)
                 .build()
         );
     }

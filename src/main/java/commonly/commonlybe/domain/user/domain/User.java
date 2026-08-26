@@ -24,16 +24,11 @@ public class User {
     @Column(length = 20)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private Authority authority;
-
     @Builder
-    public User(String accountId, String password, String name, Authority authority) {
+    public User(String accountId, String password, String name) {
         this.accountId = accountId;
         this.password = password;
         this.name = name;
-        this.authority = authority;
     }
 
     public void updatePassword(String password) {
