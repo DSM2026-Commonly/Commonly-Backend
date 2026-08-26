@@ -9,6 +9,7 @@ import commonly.commonlybe.domain.admin.service.DeleteUserService;
 import commonly.commonlybe.domain.admin.service.QueryUserListService;
 import commonly.commonlybe.global.security.auth.AuthDetails;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -47,8 +48,8 @@ public class AdminController {
     }
 
     @GetMapping("/admins")
-    public List<UserListResponse> queryUserList(@RequestParam(defaultValue = "1") int page,
-                                                @RequestParam(defaultValue = "10") int size,
+    public List<UserListResponse> queryUserList(@RequestParam(defaultValue = "1") @Min(1) int page,
+                                                @RequestParam(defaultValue = "10") @Min(1) int size,
                                                 @RequestParam(required = false) String keyword) {
         return queryUserListService.execute(page, size, keyword);
     }
