@@ -1,11 +1,10 @@
 package commonly.commonlybe.global.jwt;
 
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import javax.crypto.SecretKey;
-import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 
 @ConfigurationProperties(prefix = "jwt")
 public record JwtProperties (
@@ -14,14 +13,13 @@ public record JwtProperties (
     String prefix,
     Integer accessExp
 ) {
-    public JwtProperties(String secret, String header, String prefix, Integer accessExp) {
-        this.secret = Base64.getEncoder().encodeToString(secret.getBytes());
-        this.header = header;
-        this.prefix = prefix;
-        this.accessExp = accessExp;
+    public JwtProperties {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT secret은 32바이트(256비트) 이상이어야 합니다.");
+        }
     }
 
     public SecretKey secretKey() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 }
