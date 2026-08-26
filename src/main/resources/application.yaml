@@ -42,3 +42,4 @@ app:
     endpoint: ${S3_ENDPOINT:}
   file:
     max-rows: 10000
+
