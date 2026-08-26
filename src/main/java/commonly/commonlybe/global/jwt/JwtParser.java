@@ -1,5 +1,6 @@
 package commonly.commonlybe.global.jwt;
 
+import commonly.commonlybe.domain.user.exception.UserNotFoundException;
 import commonly.commonlybe.global.jwt.exception.ExpiredTokenException;
 import commonly.commonlybe.global.jwt.exception.InvalidTokenException;
 import commonly.commonlybe.global.security.auth.AuthDetailsService;
@@ -20,8 +21,12 @@ public class JwtParser {
 
     public Authentication parseToken(String token) {
         Claims claims = getClaims(token);
-        UserDetails userDetails = authDetailsService.loadUserByUsername(claims.getSubject());
-        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        try {
+            UserDetails userDetails = authDetailsService.loadUserByUsername(claims.getSubject());
+            return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        } catch (UserNotFoundException e) {
+            throw new InvalidTokenException();
+        }
     }
 
     private Claims getClaims(String token) {
