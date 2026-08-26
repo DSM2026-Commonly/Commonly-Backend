@@ -15,6 +15,8 @@ public enum FileErrorCode implements ErrorProperty {
     SOURCE_COLUMN_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 열입니다."),
     TARGET_FIELD_NOT_FOUND(HttpStatus.BAD_REQUEST, "존재하지 않는 필드입니다."),
     REQUIRED_FIELD_NOT_MAPPED(HttpStatus.BAD_REQUEST, "필수 필드가 매핑되지 않았습니다."),
+    DUPLICATE_TARGET_FIELD(HttpStatus.BAD_REQUEST, "같은 필드에 두 개 이상의 열을 매핑할 수 없습니다."),
+    ALREADY_CONFIRMED(HttpStatus.CONFLICT, "이미 적재가 확정된 파일입니다."),
     STORAGE_FAILURE(HttpStatus.BAD_GATEWAY, "파일 저장소 처리 중 오류가 발생했습니다.");
 
     private final HttpStatus status;
