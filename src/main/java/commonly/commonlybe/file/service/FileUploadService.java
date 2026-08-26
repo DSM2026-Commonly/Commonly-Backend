@@ -16,6 +16,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -28,6 +29,7 @@ public class FileUploadService {
     @Value("${app.file.max-rows}")
     private int maxRows;
 
+    @Transactional
     public FileUploadResponse upload(MultipartFile file) {
         FileValidator.validate(file);
 
