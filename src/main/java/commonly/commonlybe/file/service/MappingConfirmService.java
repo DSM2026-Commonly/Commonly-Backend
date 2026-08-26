@@ -27,7 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +39,10 @@ public class MappingConfirmService {
     private final CertificateRepository certificateRepository;
     private final S3Uploader s3Uploader;
 
+    @Value("${app.file.max-rows}")
+    private int maxRows;
+
+    @Transactional
     public MappingConfirmResponse confirm(Long fileId, MappingConfirmRequest request) {
         FileEntity fileEntity = fileRepository.findById(fileId)
                 .orElseThrow(() -> new FileException(FileErrorCode.FILE_NOT_FOUND));
@@ -47,6 +53,11 @@ public class MappingConfirmService {
 
         if (!request.confirmed()) {
             return new MappingConfirmResponse(false, 0, List.of());
+        }
+
+        // 확정은 파일당 한 번만 허용한다. 조건부 UPDATE라 동시 요청 중 하나만 통과한다.
+        if (fileRepository.markConfirmed(fileId) == 0) {
+            throw new FileException(FileErrorCode.ALREADY_CONFIRMED);
         }
 
         List<CertificateEntity> toInsert = new ArrayList<>();
@@ -68,7 +79,7 @@ public class MappingConfirmService {
 
     private ParsedExcel downloadAndParse(String objectKey) {
         byte[] content = s3Uploader.download(objectKey);
-        return ExcelParser.parse(new ByteArrayInputStream(content));
+        return ExcelParser.parse(new ByteArrayInputStream(content), maxRows);
     }
 
     private Map<String, Integer> buildColumnIndex(List<String> rawHeaders) {
@@ -90,7 +101,10 @@ public class MappingConfirmService {
                 throw new FileException(FileErrorCode.TARGET_FIELD_NOT_FOUND,
                         "존재하지 않는 필드입니다: '%s'".formatted(mapping.targetField()));
             }
-            mappedTargetFields.add(mapping.targetField());
+            if (!mappedTargetFields.add(mapping.targetField())) {
+                throw new FileException(FileErrorCode.DUPLICATE_TARGET_FIELD,
+                        "같은 필드에 두 개 이상의 열을 매핑할 수 없습니다: '%s'".formatted(mapping.targetField()));
+            }
         }
         for (String required : ColumnMappingTable.requiredTargetFields()) {
             if (!mappedTargetFields.contains(required)) {
