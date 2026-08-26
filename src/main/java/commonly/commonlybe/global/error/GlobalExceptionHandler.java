@@ -1,5 +1,7 @@
 package commonly.commonlybe.global.error;
 
+import commonly.commonlybe.global.error.error_code.ErrorProperty;
+import commonly.commonlybe.global.error.exception.CommonlyException;
 import commonly.commonlybe.global.error.response.ErrorResponse;
 import commonly.commonlybe.global.error.response.ValidationErrorResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -16,6 +18,14 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    @ExceptionHandler(CommonlyException.class)
+    protected ResponseEntity<ErrorResponse> handleCommonlyException(CommonlyException ex) {
+        ErrorProperty errorProperty = ex.getErrorProperty();
+        return ResponseEntity
+            .status(errorProperty.getStatus())
+            .body(ErrorResponse.of(errorProperty, ex.getMessage()));
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     protected ResponseEntity<ValidationErrorResponse> handleConstraintViolationException(ConstraintViolationException ex) {
         return ResponseEntity
