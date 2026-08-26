@@ -25,6 +25,10 @@ public class CertificateEntity {
     @Column(name = "certificate_id")
     private Long certificateId;
 
+    /** 인적사항(humans) 연결. 엑셀 적재분은 humans를 거치지 않으므로 nullable이다. */
+    @Column(name = "human_id")
+    private Long humanId;
+
     @Column(name = "name", nullable = false)
     private String name;
 
@@ -42,16 +46,19 @@ public class CertificateEntity {
     private String keyResponsibilities;
 
     @Column(name = "hire_date")
-    private String hireDate;
+    private LocalDate hireDate;
 
     @Column(name = "expiration_date")
-    private String expirationDate;
+    private LocalDate expirationDate;
 
     @Column(name = "retirement_date")
-    private String retirementDate;
+    private LocalDate retirementDate;
 
     @Column(name = "division")
     private String division;
+
+    @Column(name = "department")
+    private String department;
 
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
@@ -63,10 +70,11 @@ public class CertificateEntity {
     private String note;
 
     @Builder
-    public CertificateEntity(String name, LocalDate birthDate, Gender gender, String jobTitle,
-                              String keyResponsibilities, String hireDate, String expirationDate,
-                              String retirementDate, String division, String reason,
+    public CertificateEntity(Long humanId, String name, LocalDate birthDate, Gender gender, String jobTitle,
+                              String keyResponsibilities, LocalDate hireDate, LocalDate expirationDate,
+                              LocalDate retirementDate, String division, String department, String reason,
                               String employmentType, String note) {
+        this.humanId = humanId;
         this.name = name;
         this.birthDate = birthDate;
         this.gender = gender;
@@ -76,8 +84,33 @@ public class CertificateEntity {
         this.expirationDate = expirationDate;
         this.retirementDate = retirementDate;
         this.division = division;
+        this.department = department;
         this.reason = reason;
         this.employmentType = employmentType;
         this.note = note;
+    }
+
+    public void update(String name, LocalDate birthDate, Gender gender, String jobTitle,
+                       String keyResponsibilities, LocalDate hireDate, LocalDate expirationDate,
+                       LocalDate retirementDate, String division, String department, String reason,
+                       String employmentType, String note) {
+        this.name = name;
+        this.birthDate = birthDate;
+        this.gender = gender;
+        this.jobTitle = jobTitle;
+        this.keyResponsibilities = keyResponsibilities;
+        this.hireDate = hireDate;
+        this.expirationDate = expirationDate;
+        this.retirementDate = retirementDate;
+        this.division = division;
+        this.department = department;
+        this.reason = reason;
+        this.employmentType = employmentType;
+        this.note = note;
+    }
+
+    /** 서식 근무기간의 "까지". 퇴직일이 없으면 만료예정일, 둘 다 없으면 null(재직 중). */
+    public LocalDate workEndDate() {
+        return retirementDate != null ? retirementDate : expirationDate;
     }
 }
