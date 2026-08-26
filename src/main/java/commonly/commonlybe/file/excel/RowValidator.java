@@ -51,19 +51,6 @@ public final class RowValidator {
         String expirationDateRaw = trimToNull(fieldValues.get("expirationDate"));
         String retirementDateRaw = trimToNull(fieldValues.get("retirementDate"));
 
-        LocalDate hireDate = CellValueConverter.parseDate(hireDateRaw);
-        LocalDate expirationDate = CellValueConverter.parseDate(expirationDateRaw);
-        LocalDate retirementDate = CellValueConverter.parseDate(retirementDateRaw);
-
-        if (hireDate != null && expirationDate != null && hireDate.isAfter(expirationDate)) {
-            return RowResult.failure(
-                    "채용일(%s)이 만료예정일(%s)보다 늦습니다".formatted(hireDateRaw, expirationDateRaw));
-        }
-        if (hireDate != null && retirementDate != null && hireDate.isAfter(retirementDate)) {
-            return RowResult.failure(
-                    "채용일(%s)이 퇴직일(%s)보다 늦습니다".formatted(hireDateRaw, retirementDateRaw));
-        }
-
         CertificateEntity certificate = CertificateEntity.builder()
                 .name(name)
                 .birthDate(birthDate)
