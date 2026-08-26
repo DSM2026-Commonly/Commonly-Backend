@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -49,6 +50,17 @@ public class S3Uploader {
         } catch (SdkException e) {
             log.error("S3 다운로드 실패 : bucket={}, key={}", bucket, key, e);
             throw new FileException(FileErrorCode.STORAGE_FAILURE);
+        }
+    }
+
+    /**
+     * 후속 처리가 실패했을 때 업로드된 객체를 정리한다. 삭제 실패는 원래 예외를 가리지 않도록 로그만 남긴다.
+     */
+    public void delete(String key) {
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+        } catch (SdkException e) {
+            log.error("S3 삭제 실패 : bucket={}, key={}", bucket, key, e);
         }
     }
 
