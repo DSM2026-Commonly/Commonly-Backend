@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -37,18 +39,14 @@ public class FileUploadService {
         ParsedExcel parsedExcel = parseExcel(file);
 
         String objectKey = s3Uploader.upload(file);
-        FileEntity fileEntity;
-        try {
-            fileEntity = fileRepository.save(FileEntity.builder()
-                    .originalName(file.getOriginalFilename())
-                    .savedName(extractSavedName(objectKey))
-                    .filePath(objectKey)
-                    .fileSize(file.getSize())
-                    .build());
-        } catch (RuntimeException e) {
-            s3Uploader.delete(objectKey);
-            throw e;
-        }
+        deleteOnRollback(objectKey);
+
+        FileEntity fileEntity = fileRepository.save(FileEntity.builder()
+                .originalName(file.getOriginalFilename())
+                .savedName(extractSavedName(objectKey))
+                .filePath(objectKey)
+                .fileSize(file.getSize())
+                .build());
 
         List<String> columns = parsedExcel.headers().stream()
                 .map(HeaderNormalizer::normalize)
@@ -58,6 +56,24 @@ public class FileUploadService {
                 .toList();
 
         return new FileUploadResponse(fileEntity.getFileId(), file.getOriginalFilename(), columns, rows);
+    }
+
+    /**
+     * 메타데이터 트랜잭션이 롤백되면 S3 객체도 지운다.
+     * 결과를 알 수 없는 STATUS_UNKNOWN에서는 지우지 않는다(커밋됐을 수도 있음).
+     */
+    private void deleteOnRollback(String objectKey) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    s3Uploader.delete(objectKey);
+                }
+            }
+        });
     }
 
     private ParsedExcel parseExcel(MultipartFile file) {
