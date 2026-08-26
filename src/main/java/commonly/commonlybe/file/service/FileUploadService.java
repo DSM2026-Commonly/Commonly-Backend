@@ -33,17 +33,21 @@ public class FileUploadService {
     public FileUploadResponse upload(MultipartFile file) {
         FileValidator.validate(file);
 
-        String objectKey = s3Uploader.upload(file);
-        FileEntity fileEntity = fileRepository.save(FileEntity.builder()
-                .originalName(file.getOriginalFilename())
-                .savedName(extractSavedName(objectKey))
-                .filePath(objectKey)
-                .fileSize(file.getSize())
-                .build());
-
+        // 저장소에 추적되지 않는 개인정보 파일이 남지 않도록 파싱·검증을 먼저 끝낸다.
         ParsedExcel parsedExcel = parseExcel(file);
-        if (parsedExcel.rows().size() > maxRows) {
-            throw new FileException(FileErrorCode.ROW_COUNT_EXCEEDED);
+
+        String objectKey = s3Uploader.upload(file);
+        FileEntity fileEntity;
+        try {
+            fileEntity = fileRepository.save(FileEntity.builder()
+                    .originalName(file.getOriginalFilename())
+                    .savedName(extractSavedName(objectKey))
+                    .filePath(objectKey)
+                    .fileSize(file.getSize())
+                    .build());
+        } catch (RuntimeException e) {
+            s3Uploader.delete(objectKey);
+            throw e;
         }
 
         List<String> columns = parsedExcel.headers().stream()
@@ -58,7 +62,7 @@ public class FileUploadService {
 
     private ParsedExcel parseExcel(MultipartFile file) {
         try {
-            return ExcelParser.parse(file.getInputStream());
+            return ExcelParser.parse(file.getInputStream(), maxRows);
         } catch (IOException e) {
             throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
         }
