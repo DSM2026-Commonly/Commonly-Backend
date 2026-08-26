@@ -15,19 +15,20 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public final class ExcelParser {
 
-    private static final DataFormatter DATA_FORMATTER = new DataFormatter();
-
     private ExcelParser() {
     }
 
-    public static ParsedExcel parse(InputStream inputStream) {
+    public static ParsedExcel parse(InputStream inputStream, int maxRows) {
+        // DataFormatter는 스레드 안전하지 않으므로 호출마다 새로 만든다.
+        DataFormatter dataFormatter = new DataFormatter();
+
         try (Workbook workbook = new XSSFWorkbook(inputStream)) {
             if (workbook.getNumberOfSheets() == 0) {
                 throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
             }
             Sheet sheet = workbook.getSheetAt(0);
 
-            int firstNonEmptyRow = findFirstNonEmptyRow(sheet);
+            int firstNonEmptyRow = findFirstNonEmptyRow(sheet, dataFormatter);
             if (firstNonEmptyRow == -1) {
                 throw new FileException(FileErrorCode.UNPROCESSABLE_FILE);
             }
@@ -38,7 +39,7 @@ public final class ExcelParser {
 
             Row headerRow = sheet.getRow(0);
             int columnCount = headerRow.getLastCellNum();
-            List<String> headers = extractRowValues(headerRow, columnCount);
+            List<String> headers = extractRowValues(headerRow, columnCount, dataFormatter);
 
             List<ParsedRow> rows = new ArrayList<>();
             for (int rowNum = 1; rowNum <= sheet.getLastRowNum(); rowNum++) {
@@ -46,7 +47,10 @@ public final class ExcelParser {
                 if (row == null) {
                     continue;
                 }
-                rows.add(new ParsedRow(rowNum + 1, extractRowValues(row, columnCount)));
+                if (rows.size() == maxRows) {
+                    throw new FileException(FileErrorCode.ROW_COUNT_EXCEEDED);
+                }
+                rows.add(new ParsedRow(rowNum + 1, extractRowValues(row, columnCount, dataFormatter)));
             }
 
             return new ParsedExcel(headers, rows);
@@ -55,35 +59,35 @@ public final class ExcelParser {
         }
     }
 
-    private static int findFirstNonEmptyRow(Sheet sheet) {
+    private static int findFirstNonEmptyRow(Sheet sheet, DataFormatter dataFormatter) {
         for (int rowNum = 0; rowNum <= sheet.getLastRowNum(); rowNum++) {
             Row row = sheet.getRow(rowNum);
-            if (row != null && hasAnyContent(row)) {
+            if (row != null && hasAnyContent(row, dataFormatter)) {
                 return rowNum;
             }
         }
         return -1;
     }
 
-    private static boolean hasAnyContent(Row row) {
+    private static boolean hasAnyContent(Row row, DataFormatter dataFormatter) {
         for (int cellNum = 0; cellNum < row.getLastCellNum(); cellNum++) {
-            if (!cellValue(row, cellNum).isBlank()) {
+            if (!cellValue(row, cellNum, dataFormatter).isBlank()) {
                 return true;
             }
         }
         return false;
     }
 
-    private static List<String> extractRowValues(Row row, int columnCount) {
+    private static List<String> extractRowValues(Row row, int columnCount, DataFormatter dataFormatter) {
         List<String> values = new ArrayList<>(columnCount);
         for (int cellNum = 0; cellNum < columnCount; cellNum++) {
-            values.add(cellValue(row, cellNum));
+            values.add(cellValue(row, cellNum, dataFormatter));
         }
         return values;
     }
 
-    private static String cellValue(Row row, int cellNum) {
+    private static String cellValue(Row row, int cellNum, DataFormatter dataFormatter) {
         Cell cell = row.getCell(cellNum);
-        return cell == null ? "" : DATA_FORMATTER.formatCellValue(cell);
+        return cell == null ? "" : dataFormatter.formatCellValue(cell);
     }
 }
