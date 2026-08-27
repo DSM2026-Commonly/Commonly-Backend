@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueRequest;
@@ -17,6 +18,7 @@ import commonly.commonlybe.human.entity.HumanEntity;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,6 +45,24 @@ class SelfCertificateIssueServiceTest {
     private SelfCertificateIssueService selfCertificateIssueService;
 
     private final AuthDetails authDetails = new AuthDetails(null, "PETITIONER");
+
+    @BeforeEach
+    void 본인_발급을_켠다() {
+        ReflectionTestUtils.setField(selfCertificateIssueService, "selfIssueEnabled", true);
+    }
+
+    @Test
+    void 스위치가_꺼져_있으면_신원_조회도_하지_않고_거부한다() {
+        ReflectionTestUtils.setField(selfCertificateIssueService, "selfIssueEnabled", false);
+
+        assertThatThrownBy(() -> selfCertificateIssueService.issue(
+                authDetails, new SelfCertificateIssueRequest("은행 제출용", null)))
+                .isInstanceOf(CertificateException.class)
+                .extracting(e -> ((CertificateException) e).getErrorProperty())
+                .isEqualTo(CertificateErrorCode.SELF_ISSUE_DISABLED);
+
+        verifyNoInteractions(petitionerHumanResolver, certificateRepository, certificateIssueService);
+    }
 
     @Test
     void 본인의_재직_이력_전체로_발급한다() {

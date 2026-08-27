@@ -51,3 +51,8 @@ app:
     endpoint: ${S3_ENDPOINT:}
   file:
     max-rows: 10000
+  certificate:
+    # 본인 발급(/api/certificates/self) 스위치.
+    # 회원가입에 신원 검증이 없어 (성명, 생년월일)만 알면 남의 증명서를 뽑을 수 있다.
+    # 본인인증이 붙기 전까지 운영에서는 켜지 않는다.
+    self-issue-enabled: ${CERTIFICATE_SELF_ISSUE_ENABLED:false}

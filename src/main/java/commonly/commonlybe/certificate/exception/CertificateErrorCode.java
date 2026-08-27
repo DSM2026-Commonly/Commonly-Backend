@@ -15,7 +15,8 @@ public enum CertificateErrorCode implements ErrorProperty {
             "재직 이력이 10건을 넘어 본인 발급이 불가능합니다. 민원 담당자에게 문의하세요."),
     PETITIONER_HUMAN_NOT_MATCHED(HttpStatus.NOT_FOUND,
             "계정 정보와 일치하는 인적사항이 없습니다."),
-    NOT_OWN_CERTIFICATE(HttpStatus.FORBIDDEN, "본인의 경력증명서만 조회할 수 있습니다.");
+    NOT_OWN_CERTIFICATE(HttpStatus.FORBIDDEN, "본인의 경력증명서만 조회할 수 있습니다."),
+    SELF_ISSUE_DISABLED(HttpStatus.FORBIDDEN, "본인 발급은 현재 사용할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
