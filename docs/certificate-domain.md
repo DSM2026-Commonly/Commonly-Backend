@@ -149,6 +149,8 @@ CREATE TABLE document_number_seq (
 );
 ```
 
+> ⚠️ **`document_number_seq`는 JPA 엔티티가 아니다.** 네이티브 SQL로만 접근하므로 `ddl-auto`가 만들지도 않고 `validate`가 부재를 잡아내지도 못한다. **빠뜨리면 앱은 정상 기동하고 첫 발급 요청에서 500이 난다.** 검증 중 실제로 밟았다.
+
 전용 엔티티(`CertificateIssuedItemEntity`) 대신 `CertificateIssuedEntity`의 `@ElementCollection` + `@OrderColumn`으로 잡았다. 이 목록은 발급 건 밖에서 조회될 일이 없어서 엔티티 + 리포지토리 한 벌이 통째로 필요 없다.
 
 `certificates_issued`를 따로 두는 이유: `certificate`는 **재직 이력 한 줄**이고 발급 단위가 아니다. 한 번 발급에 재직 이력 여러 줄이 들어가고(서식 10행), 같은 이력으로 여러 번 발급될 수 있다. 명세의 `certificateId`는 문맥상 이 발급 건의 id다.
@@ -285,7 +287,37 @@ Response `201`
 
 ### 5.2 POST `/api/certificates/self` — 발급 (민원인 본인)
 
-**구현하지 않는다.** 본인이 누구인지 아는 수단이 없다 (§7-1). auth 도메인 완료 후 §5.1에 `humanId = 인증주체.humanId`, `certificateIds = 전체`를 넣는 얇은 래퍼로 붙인다. 명세의 403(본인 경력 외 접근)도 그때 같이.
+§5.1의 얇은 래퍼다. `humanId`와 `certificateIds`를 요청이 아니라 인증 주체에서 끌어온다.
+
+Request
+```json
+{ "purpose": "은행 제출용", "otherMatters": "" }
+```
+
+Response `201` — §5.1과 동일
+
+| 상태 | 조건 |
+|---|---|
+| 400 | `purpose` 누락 / 재직 이력 10건 초과 → `CERTIFICATE_LIMIT_EXCEEDED` |
+| 401 | 토큰 없음/무효 |
+| 403 | `PETITIONER` 권한 아님 (`SecurityConfig`) — **현재는 401로 나간다** (#21), §5-7 참고 |
+| 404 | 계정과 일치하는 인적사항 없음 → `PETITIONER_HUMAN_NOT_MATCHED` / 재직 이력 없음 → `CERTIFICATE_NOT_FOUND` |
+
+#### 계정 ↔ 인적사항 매칭
+
+**`Petitioner`에 `human_id` FK가 없다.** `(User.name, Petitioner.birthDate)`로 `humans(name, birth_date)`를 조회해 잇는다 — `uk_humans_name_birth_date`가 1:1을 보장하므로 결과는 최대 1건이다. `PetitionerHumanResolver`가 담당한다.
+
+> 문서 초안에는 "`humanId = 인증주체.humanId`"로 적혀 있었지만, 실제로는 `humanId`를 바로 얻을 수 없고 조회가 한 단계 필요하다.
+
+본인 발급은 이력을 고를 수 없어 **전체**를 넣는다. 서식이 10행이라 10건을 넘으면 400으로 막고 담당자에게 넘긴다.
+
+> ### ⚠️ 이 매칭은 본인임을 증명하지 못한다
+>
+> `SignupService`는 `accountId`/`password`/`name`/`phoneNumber`/`birthDate`를 받아 **아무것도 대조하지 않고** 계정을 만든다. 타인의 성명과 생년월일을 알면 그 명의로 가입해 경력증명서를 발급받을 수 있다.
+>
+> `Petitioner.phoneNumber`와 대조하려 해도 `humans`에 전화번호 컬럼이 없다.
+>
+> **본인인증(휴대폰/PASS 등)이 붙기 전까지 `/self`를 운영 환경에 열면 안 된다.** 권한 제한과 소유권 검사(§5-7)는 "로그인한 그 계정의 것만"을 보장할 뿐, "그 계정이 본인"인지는 보장하지 못한다.
 
 ### 5.3 GET `/api/certificates/{certificateId}` — 상세 조회
 
@@ -336,6 +368,24 @@ Response `200` — 없으면 `[]`
 명세 그대로: **인적사항은 있는데 재직 이력이 없으면 404가 아니라 `200 []`이다.** `humanRepository.existsById()` 먼저 확인하고 목록을 조회한다.
 
 정렬은 `hire_date ASC, certificate_id ASC`. 서식의 재직사항 표가 시간순이므로 여기서도 같은 순서로 준다. `hire_date`가 NULL인 행은 뒤로 (`NULLS LAST`).
+
+### 5-7. 접근 제어
+
+`SecurityConfig`에 경로별 권한을 건다. 이전에는 `anyRequest().authenticated()`뿐이라 **로그인한 민원인이 남의 경력증명서 상세를 그대로 조회할 수 있었다.**
+
+| 경로 | 권한 |
+|---|---|
+| `POST /api/certificates/self` | `PETITIONER` |
+| `GET /api/certificates/*/download` | 인증 + 소유권 검사 (아래) |
+| 그 외 `/api/certificates/**`, `/api/humans/*/certificates` | `ADMIN`, `USER` (민원 담당자) |
+
+다운로드만 담당자와 발급 대상자 둘 다 접근한다(명세의 403). 경로만으로는 판정할 수 없어 `CertificateService.download()`에서 검사한다 — 호출자가 `PETITIONER`면 발급 건의 `humanId`가 본인 것인지 확인하고, 아니면 `NOT_OWN_CERTIFICATE`(403).
+
+> `/api/human/**`(인적사항 CRUD)과 `/api/files/**`는 아직 `authenticated()`뿐이다. 각 도메인 범위라 건드리지 않았다.
+
+> **권한 부족이 403이 아니라 401로 나간다.** `SecurityConfig`가 `authenticationEntryPoint`만 지정하고 `accessDeniedHandler`를 두지 않아, 인증은 됐지만 권한이 없는 요청이 엔트리포인트로 흘러 본문 없는 401이 된다. 기존 `/api/admins`도 같아서 **이 도메인이 만든 문제가 아니다.** 전역 수정이라 별도 이슈(#21)로 뺐다.
+>
+> 서비스가 직접 던지는 403(`NOT_OWN_CERTIFICATE`)은 `GlobalExceptionHandler`를 타므로 정상적으로 403이 나간다.
 
 ### 5.5 GET `/api/certificates/{certificateId}/download` — 다운로드/출력
 
@@ -445,7 +495,7 @@ public enum CertificateErrorCode implements ErrorProperty {
 
 | # | 내용 | 영향 |
 |---|---|---|
-| 1 | **인증 미구현** — `SecurityConfig`가 `anyRequest().permitAll()` | 401/403 전부 구현 불가. `POST /self`(§5.2) 전체 보류. 서식의 `담당자`/`연락처` 칸도 채울 수 없다 |
+| 1 | ~~인증 미구현~~ **부분 해소** (#8 머지) | 401/403, `/self`(§5.2), 접근 제어(§5-7) 구현 완료. **다만 회원가입에 신원 검증이 없다 — §5.2 경고 참고.** 서식의 `담당자`/`연락처` 칸은 여전히 못 채운다 (발급 주체를 `certificates_issued`에 저장하지 않음) |
 | 2 | **유성구청장 직인 이미지 없음** | 발급물이 무효다. PNG(투명 배경) 확보 필요. 코드로 못 푼다 |
 | 3 | **근무부서 데이터 원천 부재** (§1-2) | `certificate.department` 컬럼은 추가됨. 채울 데이터가 없어 서식 칸 공란 출력. 유성구청 담당자에게 원천 확인 요청 |
 | 4 | **성명(영문) 없음** | 공란 출력. 필요하면 `humans`에 `name_en` 추가 |
