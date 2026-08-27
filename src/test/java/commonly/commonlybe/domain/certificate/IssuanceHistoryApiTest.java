@@ -136,4 +136,21 @@ class IssuanceHistoryApiTest {
                 .param("size", "0"))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void size가_100을_넘으면_400() throws Exception {
+        mockMvc.perform(get("/api/issuance-histories")
+                .header("Authorization", "Bearer " + adminToken)
+                .param("size", "1000000"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void endDate_없이_startDate만으로_조회() throws Exception {
+        mockMvc.perform(get("/api/issuance-histories")
+                .header("Authorization", "Bearer " + adminToken)
+                .param("startDate", "2026-08-01"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(2));
+    }
 }

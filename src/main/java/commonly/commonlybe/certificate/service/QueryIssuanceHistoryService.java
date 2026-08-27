@@ -24,7 +24,7 @@ public class QueryIssuanceHistoryService {
                                                  LocalDate endDate, String keyword) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         LocalDateTime start = (startDate == null ? MIN_DATE : startDate).atStartOfDay();
-        LocalDateTime end = (endDate == null ? MAX_DATE : endDate).plusDays(1).atStartOfDay();
+        LocalDateTime end = (endDate == null ? MAX_DATE : endDate.plusDays(1)).atStartOfDay();
 
         return certificateIssuedRepository
             .searchHistories(keyword == null ? "" : keyword, start, end, pageable)

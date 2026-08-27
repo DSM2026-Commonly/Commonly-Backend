@@ -2,6 +2,7 @@ package commonly.commonlybe.certificate.controller;
 
 import commonly.commonlybe.certificate.controller.dto.IssuanceHistoryResponse;
 import commonly.commonlybe.certificate.service.QueryIssuanceHistoryService;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
 import java.util.List;
@@ -21,7 +22,7 @@ public class IssuanceHistoryController {
     @GetMapping
     public List<IssuanceHistoryResponse> queryIssuanceHistories(
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "10") @Min(1) int size,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String keyword) {
