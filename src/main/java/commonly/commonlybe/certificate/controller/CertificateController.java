@@ -4,8 +4,11 @@ import commonly.commonlybe.certificate.controller.dto.CertificateDetailResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueRequest;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateUpdateRequest;
+import commonly.commonlybe.certificate.controller.dto.SelfCertificateIssueRequest;
 import commonly.commonlybe.certificate.service.CertificateIssueService;
 import commonly.commonlybe.certificate.service.CertificateService;
+import commonly.commonlybe.certificate.service.SelfCertificateIssueService;
+import commonly.commonlybe.global.security.auth.AuthDetails;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,11 +36,20 @@ public class CertificateController {
 
     private final CertificateIssueService certificateIssueService;
     private final CertificateService certificateService;
+    private final SelfCertificateIssueService selfCertificateIssueService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CertificateIssueResponse issue(@RequestBody @Valid CertificateIssueRequest request) {
         return certificateIssueService.issue(request);
+    }
+
+    /** 발급 대상과 재직 이력을 요청이 아니라 인증 주체에서 끌어온다. */
+    @PostMapping("/self")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CertificateIssueResponse issueSelf(@AuthenticationPrincipal AuthDetails authDetails,
+                                              @RequestBody @Valid SelfCertificateIssueRequest request) {
+        return selfCertificateIssueService.issue(authDetails, request);
     }
 
     @GetMapping("/{certificateId}")
@@ -52,8 +65,9 @@ public class CertificateController {
     }
 
     @GetMapping("/{certificateId}/download")
-    public ResponseEntity<Resource> download(@PathVariable Long certificateId) {
-        CertificateService.IssuedFile file = certificateService.download(certificateId);
+    public ResponseEntity<Resource> download(@PathVariable Long certificateId,
+                                            @AuthenticationPrincipal AuthDetails authDetails) {
+        CertificateService.IssuedFile file = certificateService.download(certificateId, authDetails);
         // 문서번호에 한글이 들어간다. filename*(RFC 5987)이 없으면 브라우저가 깨진 이름으로 저장한다.
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(file.fileName(), StandardCharsets.UTF_8)
