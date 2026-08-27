@@ -27,13 +27,13 @@ public class CreateUserService {
             throw new UserAlreadyExistsException();
         }
 
-        User user = userRepository.save(
-            User.builder()
-                .accountId(request.getAccountId())
-                .password(passwordEncoder.encode(INITIAL_PASSWORD))
-                .name(request.getName())
-                .build()
-        );
+        User user = User.builder()
+            .accountId(request.getAccountId())
+            .password(passwordEncoder.encode(INITIAL_PASSWORD))
+            .name(request.getName())
+            .build();
+        user.requirePasswordChange();
+        userRepository.save(user);
 
         adminRepository.save(
             Admin.builder()
