@@ -29,6 +29,16 @@ class CorsTest {
     }
 
     @Test
+    void HEAD_프리플라이트도_허용된다() throws Exception {
+        mockMvc.perform(options("/api/admins")
+                .header("Origin", "http://localhost:3000")
+                .header("Access-Control-Request-Method", "HEAD")
+                .header("Access-Control-Request-Headers", "Authorization"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+    }
+
+    @Test
     void 인증_필요한_경로도_프리플라이트는_통과한다() throws Exception {
         mockMvc.perform(options("/api/admins")
                 .header("Origin", "https://commonly.example.com")
