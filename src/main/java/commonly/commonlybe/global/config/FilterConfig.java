@@ -4,6 +4,7 @@ import commonly.commonlybe.global.error.GlobalExceptionFilter;
 import commonly.commonlybe.global.jwt.JwtFilter;
 import commonly.commonlybe.global.jwt.JwtParser;
 import commonly.commonlybe.global.jwt.JwtProperties;
+import commonly.commonlybe.global.security.InitialPasswordFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -21,6 +22,7 @@ public class FilterConfig extends AbstractHttpConfigurer<FilterConfig, HttpSecur
     @Override
     public void configure(HttpSecurity http) {
         http.addFilterBefore(new JwtFilter(jwtProperties, jwtParser), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(new InitialPasswordFilter(), JwtFilter.class);
         http.addFilterBefore(new GlobalExceptionFilter(objectMapper), JwtFilter.class);
     }
 }
