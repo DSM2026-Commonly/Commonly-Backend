@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class CreateUserService {
-    private static final String DUMMY_DEPARTMENT = "미배정";
+    static final String INITIAL_PASSWORD = "abcd1234";
 
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
@@ -30,7 +30,7 @@ public class CreateUserService {
         User user = userRepository.save(
             User.builder()
                 .accountId(request.getAccountId())
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(passwordEncoder.encode(INITIAL_PASSWORD))
                 .name(request.getName())
                 .build()
         );
@@ -38,7 +38,7 @@ public class CreateUserService {
         adminRepository.save(
             Admin.builder()
                 .user(user)
-                .department(DUMMY_DEPARTMENT)
+                .department(request.getDepartment())
                 .role(AdminRole.USER)
                 .build()
         );
