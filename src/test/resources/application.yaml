@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: Commonly-be
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+jwt:
+  secret: test-secret-key-for-local-tests-1234567890
+  header: Authorization
+  prefix: Bearer
+  access-exp: 3600
+
+app:
+  s3:
+    bucket: test-bucket
+    region: ap-northeast-2
+    endpoint: ""
+  file:
+    max-rows: 10000
