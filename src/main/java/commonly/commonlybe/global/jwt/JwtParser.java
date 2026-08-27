@@ -1,6 +1,6 @@
 package commonly.commonlybe.global.jwt;
 
-import commonly.commonlybe.domain.user.exception.UserNotFoundException;
+import commonly.commonlybe.user.exception.UserNotFoundException;
 import commonly.commonlybe.global.jwt.exception.ExpiredTokenException;
 import commonly.commonlybe.global.jwt.exception.InvalidTokenException;
 import commonly.commonlybe.global.security.auth.AuthDetailsService;
