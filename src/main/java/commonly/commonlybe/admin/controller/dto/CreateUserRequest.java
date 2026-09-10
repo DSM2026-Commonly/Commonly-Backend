@@ -13,10 +13,10 @@ public class CreateUserRequest {
     private String accountId;
 
     @NotBlank
-    @Size(min = 8, max = 72)
-    private String password;
+    @Size(max = 20)
+    private String name;
 
     @NotBlank
     @Size(max = 20)
-    private String name;
+    private String department;
 }

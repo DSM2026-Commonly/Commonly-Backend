@@ -50,7 +50,8 @@ public class SecurityConfig {
                 auth
                     .requestMatchers("/api/auths/login", "/api/auths/signup").permitAll()
                     .requestMatchers("/api/admin/password").hasAnyAuthority("ADMIN", "USER")
-                    .requestMatchers("/api/admin/**", "/api/admins").hasAuthority("ADMIN");
+                    .requestMatchers("/api/admin/**", "/api/admins").hasAuthority("ADMIN")
+                    .requestMatchers("/api/issuance-histories").hasAnyAuthority("ADMIN", "USER");
 
                 // 본인 발급. 담당자는 /api/certificates를 쓴다.
                 // 신원 검증이 붙기 전까지는 기본 차단이고, 명시적으로 켠 환경에서만 열린다.
