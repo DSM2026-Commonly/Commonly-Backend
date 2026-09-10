@@ -1,5 +1,7 @@
 package commonly.commonlybe.certificate.controller;
 
+import commonly.commonlybe.certificate.controller.dto.CertificateCreateRequest;
+import commonly.commonlybe.certificate.controller.dto.CertificateCreateResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateDetailResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueRequest;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueResponse;
@@ -50,6 +52,16 @@ public class CertificateController {
     public CertificateIssueResponse issueSelf(@AuthenticationPrincipal AuthDetails authDetails,
                                               @RequestBody @Valid SelfCertificateIssueRequest request) {
         return selfCertificateIssueService.issue(authDetails, request);
+    }
+
+    /**
+     * 재직 이력 한 줄 등록. 발급이 이미 POST /api/certificates를 쓰고 있어 경로에 동사가 들어갔다.
+     * 리터럴 경로라 /{certificateId} 패턴보다 먼저 매칭된다.
+     */
+    @PostMapping("/create")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CertificateCreateResponse create(@RequestBody @Valid CertificateCreateRequest request) {
+        return certificateService.create(request);
     }
 
     @GetMapping("/{certificateId}")
