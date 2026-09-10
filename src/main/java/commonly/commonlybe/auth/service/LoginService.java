@@ -5,7 +5,6 @@ import commonly.commonlybe.auth.controller.dto.TokenResponse;
 import commonly.commonlybe.user.entity.User;
 import commonly.commonlybe.user.repository.UserRepository;
 import commonly.commonlybe.user.exception.PasswordMismatchException;
-import commonly.commonlybe.global.jwt.JwtGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,9 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class LoginService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtGenerator jwtGenerator;
+    private final TokenIssuer tokenIssuer;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TokenResponse execute(LoginRequest request) {
         User user = userRepository.findByAccountId(request.getAccountId())
             .orElseThrow(PasswordMismatchException::new);
@@ -27,8 +26,6 @@ public class LoginService {
             throw new PasswordMismatchException();
         }
 
-        return TokenResponse.builder()
-            .accessToken(jwtGenerator.generateAccessToken(user.getAccountId()))
-            .build();
+        return tokenIssuer.issue(user.getAccountId());
     }
 }

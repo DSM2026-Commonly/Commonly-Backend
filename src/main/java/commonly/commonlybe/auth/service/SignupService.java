@@ -7,7 +7,6 @@ import commonly.commonlybe.petitioner.repository.PetitionerRepository;
 import commonly.commonlybe.user.entity.User;
 import commonly.commonlybe.user.repository.UserRepository;
 import commonly.commonlybe.user.exception.UserAlreadyExistsException;
-import commonly.commonlybe.global.jwt.JwtGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,7 +18,7 @@ public class SignupService {
     private final UserRepository userRepository;
     private final PetitionerRepository petitionerRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtGenerator jwtGenerator;
+    private final TokenIssuer tokenIssuer;
 
     @Transactional
     public TokenResponse execute(SignupRequest request) {
@@ -43,8 +42,6 @@ public class SignupService {
                 .build()
         );
 
-        return TokenResponse.builder()
-            .accessToken(jwtGenerator.generateAccessToken(user.getAccountId()))
-            .build();
+        return tokenIssuer.issue(user.getAccountId());
     }
 }

@@ -20,7 +20,7 @@ public class JwtParser {
     private final AuthDetailsService authDetailsService;
 
     public Authentication parseToken(String token) {
-        Claims claims = getClaims(token);
+        Claims claims = getClaims(token, TokenType.ACCESS);
         try {
             UserDetails userDetails = authDetailsService.loadUserByUsername(claims.getSubject());
             return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
@@ -29,9 +29,15 @@ public class JwtParser {
         }
     }
 
-    private Claims getClaims(String token) {
+    /** 리프레시 토큰의 서명·만료·타입을 검증하고 accountId를 돌려준다. */
+    public String parseRefreshTokenSubject(String token) {
+        return getClaims(token, TokenType.REFRESH).getSubject();
+    }
+
+    private Claims getClaims(String token, TokenType expected) {
+        Claims claims;
         try {
-            return Jwts.parser()
+            claims = Jwts.parser()
                 .verifyWith(jwtProperties.secretKey())
                 .build()
                 .parseSignedClaims(token)
@@ -41,5 +47,12 @@ public class JwtParser {
         } catch (Exception e) {
             throw new InvalidTokenException();
         }
+
+        // 타입이 다르면 유효하지 않은 토큰으로 본다.
+        // 어느 타입이었는지는 알려주지 않는다.
+        if (!expected.name().equals(claims.get(JwtGenerator.TOKEN_TYPE_CLAIM, String.class))) {
+            throw new InvalidTokenException();
+        }
+        return claims;
     }
 }
