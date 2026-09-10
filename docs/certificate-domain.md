@@ -387,6 +387,44 @@ Response `200` — 없으면 `[]`
 >
 > 서비스가 직접 던지는 403(`NOT_OWN_CERTIFICATE`)은 `GlobalExceptionHandler`를 타므로 정상적으로 403이 나간다.
 
+### 5.7 POST `/api/certificates/create` — 개별 등록 (#31)
+
+재직 이력 한 줄 등록. 이게 없으면 경력 행을 만들 수 있는 경로가 엑셀 업로드뿐이라 관리자 앱의
+개별 등록 화면이 아예 동작하지 않았다. 없던 시절엔 `/create`가 `/{certificateId}`에 매칭돼
+`405 Allow: GET, PUT`이 나갔다.
+
+Request
+```json
+{
+  "humanId": 1,
+  "jobTitle": "주무관", "keyResponsibilities": "민원 접수",
+  "hireDate": "2020-01-01", "expirationDate": "2022-03-14", "retirementDate": null,
+  "division": "채용", "department": "총무과",
+  "reason": null, "employmentType": "기간제", "note": null
+}
+```
+
+Response `201` — `{ "certificateId": 1 }`. §5.1의 `certificateIds`에 그대로 넣는 값이다.
+
+| 상태 | 조건 |
+|---|---|
+| 400 | 검증 실패 (`division`/`employmentType` 허용값, `hireDate > retirementDate`) |
+| 401 | 토큰 없음/무효 |
+| 404 | `humanId` 없음 → `HUMAN_NOT_FOUND` |
+
+검증은 §5.6(`CertificateUpdateRequest`)과 같다. `CertificateCodes` 상수를 공유한다.
+
+#### 명세와 다르게 가는 부분
+
+| # | 명세 | 여기 | 이유 |
+|---|---|---|---|
+| 1 | `humanId` 없음 | `@NotNull humanId` | 등록 화면이 `POST /api/human`으로 대상자를 만든 뒤 붙이는 흐름이다. `(name, birthDate, gender)`로 find-or-create 하면 `humans` 유니크 제약·중복 409·`address` 처리를 certificate 도메인에 복제하게 되고, 서식에 인쇄되는 `humans.address`를 채울 방법이 없다 |
+| 2 | `name`/`birthDate`/`gender` 필수 | **안 받는다.** `humans` 행에서 복사 | (a) 성별 표기가 두 벌이다 — `human.entity.Gender`는 `M`/`F`(`@JsonValue`), `certificate.entity.Gender`는 `MALE`/`FEMALE`(Jackson 기본). 한 화면에서 표기가 두 번 바뀌면 프론트가 `M`을 보내는 순간 400이다. (b) §2-1의 `human_id` 백필이 `(name, birth_date)` 일치 전제라, 본문 값이 `humans`와 어긋나면 그 전제가 조용히 깨진다. 프론트가 계속 보내도 Jackson 기본값이 무시하므로 400은 안 난다 |
+| 3 | `department` 없음 | 받는다 (nullable) | 서식에 인쇄되는 칸인데 §1-2 기준 채우는 경로가 하나도 없었다. 여기서 안 받으면 등록 직후 §5.6 PUT을 한 번 더 쳐야 근무부서가 들어간다. **`humans.department`는 상속하지 않는다** — 사람당 하나뿐이라 전보 이력에 반복해 찍으면 틀린 값이 인쇄된다 |
+| 4 | — | 경로에 동사(`/create`) | `POST /api/certificates`를 발급(§5.1)이 이미 쓴다. 명세·프론트가 `/create`로 확정돼 있어 그대로 간다. 리터럴 경로라 `/{certificateId}`보다 먼저 매칭된다 |
+
+`SecurityConfig`는 손대지 않았다 — `/api/certificates/**` → `ADMIN`/`USER`에 이미 걸린다.
+
 ### 5.5 GET `/api/certificates/{certificateId}/download` — 다운로드/출력
 
 Response `200` `application/pdf` (binary), `Content-Disposition: attachment; filename="유성구-2026-000001.pdf"`
