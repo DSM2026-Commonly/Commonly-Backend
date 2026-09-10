@@ -2,11 +2,11 @@ package commonly.commonlybe.domain.certificate;
 
 import commonly.commonlybe.certificate.entity.CertificateIssuedEntity;
 import commonly.commonlybe.certificate.repository.CertificateIssuedRepository;
-import commonly.commonlybe.domain.admin.domain.Admin;
-import commonly.commonlybe.domain.admin.domain.AdminRole;
-import commonly.commonlybe.domain.admin.domain.repository.AdminRepository;
-import commonly.commonlybe.domain.user.domain.User;
-import commonly.commonlybe.domain.user.domain.repository.UserRepository;
+import commonly.commonlybe.admin.entity.Admin;
+import commonly.commonlybe.admin.entity.AdminRole;
+import commonly.commonlybe.admin.repository.AdminRepository;
+import commonly.commonlybe.user.entity.User;
+import commonly.commonlybe.user.repository.UserRepository;
 import commonly.commonlybe.human.entity.Gender;
 import commonly.commonlybe.human.entity.HumanEntity;
 import commonly.commonlybe.human.repository.HumanRepository;

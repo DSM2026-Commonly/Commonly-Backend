@@ -1,6 +1,6 @@
 package commonly.commonlybe.global.security.auth;
 
-import commonly.commonlybe.domain.user.domain.User;
+import commonly.commonlybe.user.entity.User;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

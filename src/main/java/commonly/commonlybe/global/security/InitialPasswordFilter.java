@@ -1,6 +1,6 @@
 package commonly.commonlybe.global.security;
 
-import commonly.commonlybe.domain.user.exception.InitialPasswordNotChangedException;
+import commonly.commonlybe.user.exception.InitialPasswordNotChangedException;
 import commonly.commonlybe.global.security.auth.AuthDetails;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

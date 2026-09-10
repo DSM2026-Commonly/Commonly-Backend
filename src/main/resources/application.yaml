@@ -37,13 +37,6 @@ jwt:
   prefix: ${JWT_PREFIX:Bearer}
   access-exp: ${JWT_ACCESS_EXP:3600}
 
-garage:
-  endpoint: ${GARAGE_ENDPOINT:http://garage:3900}
-  region: ${GARAGE_REGION:garage}
-  bucket: ${GARAGE_BUCKET:commonly}
-  access-key: ${GARAGE_ACCESS_KEY:}
-  secret-key: ${GARAGE_SECRET_KEY:}
-
 app:
   s3:
     bucket: ${S3_BUCKET:commonly-files}

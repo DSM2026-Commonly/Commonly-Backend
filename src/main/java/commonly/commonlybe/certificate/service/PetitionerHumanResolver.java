@@ -2,8 +2,8 @@ package commonly.commonlybe.certificate.service;
 
 import commonly.commonlybe.certificate.exception.CertificateErrorCode;
 import commonly.commonlybe.certificate.exception.CertificateException;
-import commonly.commonlybe.domain.petitioner.domain.Petitioner;
-import commonly.commonlybe.domain.petitioner.domain.repository.PetitionerRepository;
+import commonly.commonlybe.petitioner.entity.Petitioner;
+import commonly.commonlybe.petitioner.repository.PetitionerRepository;
 import commonly.commonlybe.global.security.auth.AuthDetails;
 import commonly.commonlybe.human.entity.HumanEntity;
 import commonly.commonlybe.human.repository.HumanRepository;
