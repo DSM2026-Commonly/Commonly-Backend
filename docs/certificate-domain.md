@@ -130,7 +130,7 @@ CREATE TABLE certificates_issued (
     total_months  INT          NOT NULL,
     total_days    INT          NOT NULL,
     issued_at     TIMESTAMP    NOT NULL,
-    file_path     VARCHAR(512)            -- S3 object key. PDF 생성 후 채움
+    file_path     VARCHAR(512)            -- S3 object key. 발급 트랜잭션 안에서 PDF를 올리고 채움
 );
 
 -- 발급 1건이 포함한 재직사항 행들. 서식 재직사항 표의 각 행.
@@ -212,10 +212,10 @@ Period.between(from, to.plusDays(1));  // 재직일수는 양끝 포함
 **서식 파일은 레이아웃 명세로만 쓰고**, 같은 레이아웃의 XHTML을 만들어 PDF로 렌더한다. 서식은 표 3개 + 텍스트뿐이라 재현이 어렵지 않다.
 
 ```
-implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.28'
+implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.87'
 ```
 
-**새로 추가하는 의존성은 이거 하나.** 한글 폰트(나눔고딕 등) `.ttf`를 `src/main/resources/fonts/`에 넣고 `@font-face`로 임베드해야 한다 — 안 하면 전부 두부(□)로 나온다.
+**새로 추가하는 의존성은 이거 하나.** 한글 폰트는 나눔고딕(`NanumGothic-Regular/Bold.ttf`, OFL — 라이선스 `fonts/NanumGothic-OFL.txt`)을 `src/main/resources/fonts/`에 넣고 `PdfRendererBuilder.useFont`로 서브셋 임베드한다 — 안 하면 전부 두부(□)로 나온다. 시스템의 Noto CJK `.ttc`(CFF)는 PDFBox가 제대로 임베드하지 못해 쓰지 않는다. 폰트 리소스가 없으면 렌더를 실패시킨다 — 두부 PDF가 정상 발급되는 것보다 낫다.
 
 | 대안 | 왜 안 씀 |
 |---|---|
@@ -223,11 +223,15 @@ implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.28'
 | POI로 .docx 생성 | POI는 이미 있지만 출력이 Word다. 명세는 `application/pdf` |
 | 브라우저 인쇄용 HTML만 반환 | 명세가 PDF binary |
 
-> openhtmltopdf는 XHTML만 받는다. 태그를 닫지 않으면 파싱 에러가 난다.
+> openhtmltopdf는 XHTML만 받는다. 태그를 닫지 않으면 파싱 에러가 난다. 값은 전부 `& < > " '` 이스케이프 후 넣는다.
+
+구현: `certificate/document/CertificatePdfRenderer`. 서식 칸 중 데이터가 없는 것(담당자/연락처, 성명(영문), 근무부서, 직인)은 공란이다 (§1, §7-1). 서식의 퇴직사유 칸은 하나뿐이라 **가장 최근 재직 행**(입사일 오름차순 마지막)의 `reason`을 찍는다.
 
 ### 4-2. 저장
 
-생성 PDF는 `S3Uploader`로 올리고 `certificates_issued.file_path`에 key를 넣는다. 다운로드(§5.5)는 그 key로 받아서 스트리밍한다.
+생성 PDF는 `S3Uploader`로 `issued/certificates/{발급연도}/{certificateIssuedId}.pdf`에 올리고 `certificates_issued.file_path`에 key를 넣는다. 다운로드(§5.5)는 그 key로 받아서 스트리밍한다.
+
+**PDF 렌더나 업로드가 실패하면 발급 자체를 실패시킨다** (#34). 201을 받고도 다운로드가 404인 발급 건이 남으면 사용자는 재발급을 반복하고 이력만 쌓인다. 렌더 실패는 `500 CERTIFICATE_PDF_RENDER_FAILED`, 업로드 실패는 `500 STORAGE_FAILURE`이고 발급 행·채번 모두 롤백된다. 업로드 뒤 커밋이 실패하면 `afterCompletion`에서 올린 객체를 지운다.
 
 재발급 시 매번 새로 렌더하지 않는다 — 발급된 증명서는 **불변**이어야 한다. 원본 데이터가 나중에 수정돼도 이미 발급된 PDF는 그대로여야 하므로, `file_path`가 있으면 그걸 내려준다.
 
@@ -506,7 +510,8 @@ commonly/commonlybe/certificate/
 public enum CertificateErrorCode implements ErrorProperty {
     CERTIFICATE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 경력사항을 찾을 수 없습니다."),
     CERTIFICATE_ISSUED_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 경력증명서를 찾을 수 없습니다."),
-    CERTIFICATE_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "발급된 증명서 파일이 없습니다.");
+    CERTIFICATE_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "발급된 증명서 파일이 없습니다."),
+    CERTIFICATE_PDF_RENDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "증명서 PDF 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;
     private final String message;
@@ -523,7 +528,7 @@ public enum CertificateErrorCode implements ErrorProperty {
 |---|---|---|
 | ~~`refactor: certificate 날짜 컬럼 LocalDate 전환`~~ ✅ | `file/excel/RowValidator` | §2-2. 완료 |
 | ~~`refactor: 구분/근무형태 허용값 상수 통합`~~ ✅ | `file/excel/RowValidator` | §5.6. 완료. 상수는 `certificate/entity/CertificateCodes`로 |
-| `build: openhtmltopdf 추가` | `build.gradle` | §4-1. **아직 안 함** — §7-1 2·9번이 풀려야 의미가 있다 |
+| ~~`build: openhtmltopdf 추가`~~ ✅ | `build.gradle` | §4-1. 완료 (#34) |
 
 ---
 
@@ -534,14 +539,14 @@ public enum CertificateErrorCode implements ErrorProperty {
 | # | 내용 | 영향 |
 |---|---|---|
 | 1 | ~~인증 미구현~~ **부분 해소** (#8 머지) | 401/403, `/self`(§5.2), 접근 제어(§5-7) 구현 완료. **다만 회원가입에 신원 검증이 없다 — §5.2 경고 참고.** 서식의 `담당자`/`연락처` 칸은 여전히 못 채운다 (발급 주체를 `certificates_issued`에 저장하지 않음) |
-| 2 | **유성구청장 직인 이미지 없음** | 발급물이 무효다. PNG(투명 배경) 확보 필요. 코드로 못 푼다 |
+| 2 | **유성구청장 직인 이미지 없음** | 발급물이 무효다. PNG(투명 배경) 확보 필요. 코드로 못 푼다. 그때까지 PDF는 `(인)` 자리를 비워 발급한다 (#34) |
 | 3 | **근무부서 데이터 원천 부재** (§1-2) | `certificate.department` 컬럼은 추가됨. 채울 데이터가 없어 서식 칸 공란 출력. 유성구청 담당자에게 원천 확인 요청 |
 | 4 | **성명(영문) 없음** | 공란 출력. 필요하면 `humans`에 `name_en` 추가 |
 | 5 | **발급 이력 연결** — 명세 처리로직 1번 | `구분 = 발급 이력`은 담당자가 다르다(`/api/issuance-histories`). certificate 도메인은 `certificates_issued`까지만 쓰고, 이력 적재 인터페이스는 그쪽과 합의 후 붙인다 |
 | 6 | 근무기간 구간 중복 (§3-2) | 원본 데이터 확인 필요. 확인 전까지 단순 합산 |
 | 7 | 마이그레이션 도구 없음 | §2 DDL 수동 적용. **`certificate` 백필(§2-1)은 되돌리기 어려우니 배포 전 스테이징에서 먼저** |
 | 8 | **총 근무기간 산정 기준 미확인** (§3-2) | 1개월 = 30일로 구현. 유성구청 기준이 다르면 `WorkPeriodCalculator.DAYS_PER_MONTH` 한 줄 |
-| 9 | **한글 폰트 파일 없음** | PDF 렌더링 시 전부 두부(□). 나눔고딕 등 `.ttf` 필요 (§4-1) |
+| 9 | ~~한글 폰트 파일 없음~~ ✅ | 나눔고딕 `.ttf` 추가 (§4-1, #34) |
 
 1~4, 8~9는 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
 
@@ -583,11 +588,11 @@ public enum CertificateErrorCode implements ErrorProperty {
 5. ~~`DocumentNumberGenerator` (§3-1)~~ ✅ 실제 Postgres에서 채번 확인 (§7-3)
 6. ~~GET `/api/humans/{humanId}/certificates` (§5.4)~~ ✅
 7. ~~PUT `/api/certificates/{certificateId}` (§5.6) + 허용값 상수 통합~~ ✅
-8. `CertificatePdfRenderer` (§4) — **안 함.** 직인 이미지(§7-1 2번)와 한글 폰트(§7-1 9번)가 없으면 만들어도 무효한 문서가 나온다
+8. ~~`CertificatePdfRenderer` (§4)~~ ✅ (#34). 직인(§7-1 2번)은 아직 공란
 9. ~~POST `/api/certificates` (§5.1) → GET 상세(§5.3) → GET 다운로드(§5.5)~~ ✅
 
 ### 지금 상태
 
-발급 → 조회 → 수정까지 전부 동작한다. **PDF만 없다.** `certificates_issued.file_path`가 계속 null이라 §5.5는 `404 CERTIFICATE_FILE_NOT_FOUND`를 낸다. 직인과 폰트가 확보되면 `document/CertificatePdfRenderer`를 추가하고 발급 트랜잭션 끝에서 S3에 올린 뒤 `file_path`를 채우면 된다 — 다른 코드는 안 건드려도 된다.
+발급 → PDF 생성·저장 → 조회 → 다운로드 → 수정까지 동작한다 (#34). **직인만 없다.** 직인 PNG가 확보되면 `CertificatePdfRenderer`의 `(인)` 자리에 이미지를 겹쳐 찍으면 된다 — 다른 코드는 안 건드려도 된다. #34 이전에 발급된 건은 `file_path`가 null이라 여전히 404이고, 재발급하면 된다.
 
 auth 완료 후: `POST /api/certificates/self` (§5.2), 401/403 전반, 서식 담당자/연락처 칸.
