@@ -43,6 +43,18 @@ public class S3Uploader {
         return key;
     }
 
+    /** 서버에서 만든 파일(발급 PDF 등)을 정해진 key로 올린다. */
+    public void upload(String key, byte[] content, String contentType) {
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
+                    RequestBody.fromBytes(content));
+        } catch (SdkException e) {
+            log.error("S3 업로드 실패 : bucket={}, key={}", bucket, key, e);
+            throw new FileException(FileErrorCode.STORAGE_FAILURE);
+        }
+    }
+
     public byte[] download(String key) {
         try {
             return s3Client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build())

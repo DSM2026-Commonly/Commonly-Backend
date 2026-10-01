@@ -54,7 +54,7 @@ public class CertificateIssuedEntity {
     @Column(name = "issued_at", nullable = false)
     private LocalDateTime issuedAt;
 
-    /** S3 object key. PDF 생성 전까지는 null. */
+    /** S3 object key. 발급 트랜잭션 안에서 PDF를 올린 뒤 채운다. */
     @Column(name = "file_path", length = 512)
     private String filePath;
 
@@ -81,5 +81,9 @@ public class CertificateIssuedEntity {
         this.totalDays = totalDays;
         this.issuedAt = issuedAt;
         this.certificateIds = new ArrayList<>(certificateIds);
+    }
+
+    public void attachFile(String filePath) {
+        this.filePath = filePath;
     }
 }
