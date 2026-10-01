@@ -11,6 +11,8 @@ public enum CertificateErrorCode implements ErrorProperty {
     CERTIFICATE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 경력사항을 찾을 수 없습니다."),
     CERTIFICATE_ISSUED_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 경력증명서를 찾을 수 없습니다."),
     CERTIFICATE_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "발급된 증명서 파일이 없습니다."),
+    CERTIFICATE_PDF_RENDER_FAILED(HttpStatus.INTERNAL_SERVER_ERROR,
+            "증명서 PDF 생성에 실패했습니다. 잠시 후 다시 시도해 주세요."),
     CERTIFICATE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST,
             "재직 이력이 10건을 넘어 본인 발급이 불가능합니다. 민원 담당자에게 문의하세요."),
     PETITIONER_HUMAN_NOT_MATCHED(HttpStatus.NOT_FOUND,
