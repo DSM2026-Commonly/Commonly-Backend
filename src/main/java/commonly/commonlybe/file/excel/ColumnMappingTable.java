@@ -10,7 +10,8 @@ public final class ColumnMappingTable {
             "employmentType", "note"
     );
 
-    private static final Set<String> REQUIRED_TARGET_FIELDS = Set.of("name", "gender");
+    /** birthDate는 humans 매칭 키(성명, 생년월일)라 필수다. */
+    private static final Set<String> REQUIRED_TARGET_FIELDS = Set.of("name", "birthDate", "gender");
 
     private ColumnMappingTable() {
     }

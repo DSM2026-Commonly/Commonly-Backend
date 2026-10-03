@@ -1,10 +1,10 @@
 package commonly.commonlybe.global.security.auth;
 
-import commonly.commonlybe.domain.admin.domain.Admin;
-import commonly.commonlybe.domain.admin.domain.repository.AdminRepository;
-import commonly.commonlybe.domain.user.domain.User;
-import commonly.commonlybe.domain.user.domain.repository.UserRepository;
-import commonly.commonlybe.domain.user.exception.UserNotFoundException;
+import commonly.commonlybe.admin.entity.Admin;
+import commonly.commonlybe.admin.repository.AdminRepository;
+import commonly.commonlybe.user.entity.User;
+import commonly.commonlybe.user.repository.UserRepository;
+import commonly.commonlybe.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

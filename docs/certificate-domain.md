@@ -92,7 +92,9 @@ SELECT certificate_id, hire_date, expiration_date, retirement_date FROM certific
     OR retirement_date !~ '^\d{4}-\d{2}-\d{2}$' AND NULLIF(retirement_date, '') IS NOT NULL;
 ```
 
-`human_id`는 **nullable로 둔다.** 엑셀 업로드(`MappingConfirmService`)는 `humans`를 거치지 않고 `certificate`에 바로 넣기 때문에, NOT NULL로 잠그면 기존 업로드 경로가 전부 깨진다. (2)의 백필로 매칭 안 되는 행 = 인적사항이 아직 등록 안 된 사람이고, 그 행은 발급 대상에서 빠진다.
+`human_id`는 **nullable로 둔다.** (2)의 백필로 매칭 안 되는 행 = 인적사항이 아직 등록 안 된 사람이고, 그 행은 발급 대상에서 빠진다.
+
+엑셀 일괄 등록(`MappingConfirmService`)은 #35부터 행마다 (성명, 생년월일)로 `humans`를 찾아 `human_id`를 채운다. 인적사항이 없는 행은 저장하지 않고 `failedRows`로 돌려준다. 그 전에 업로드돼 `human_id`가 NULL로 남은 행은 (2)의 백필을 한 번 더 돌려 보정한다.
 
 ```sql
 -- 백필 후 매칭 실패 행 확인. 0이 아니면 human 등록부터.
@@ -148,6 +150,8 @@ CREATE TABLE document_number_seq (
     last_no  BIGINT NOT NULL
 );
 ```
+
+> ⚠️ **`document_number_seq`는 JPA 엔티티가 아니다.** 네이티브 SQL로만 접근하므로 `ddl-auto`가 만들지도 않고 `validate`가 부재를 잡아내지도 못한다. **빠뜨리면 앱은 정상 기동하고 첫 발급 요청에서 500이 난다.** 검증 중 실제로 밟았다.
 
 전용 엔티티(`CertificateIssuedItemEntity`) 대신 `CertificateIssuedEntity`의 `@ElementCollection` + `@OrderColumn`으로 잡았다. 이 목록은 발급 건 밖에서 조회될 일이 없어서 엔티티 + 리포지토리 한 벌이 통째로 필요 없다.
 
@@ -210,10 +214,12 @@ Period.between(from, to.plusDays(1));  // 재직일수는 양끝 포함
 **서식 파일은 레이아웃 명세로만 쓰고**, 같은 레이아웃의 XHTML을 만들어 PDF로 렌더한다. 서식은 표 3개 + 텍스트뿐이라 재현이 어렵지 않다.
 
 ```
-implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.28'
+implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.87'
 ```
 
-**새로 추가하는 의존성은 이거 하나.** 한글 폰트(나눔고딕 등) `.ttf`를 `src/main/resources/fonts/`에 넣고 `@font-face`로 임베드해야 한다 — 안 하면 전부 두부(□)로 나온다.
+**새로 추가하는 의존성은 이거 하나.** 한글 폰트는 나눔고딕(OFL) Regular/Bold `.ttf`를 `src/main/resources/fonts/`에 넣고 `PdfRendererBuilder.useFont`로 임베드한다 — 안 하면 전부 두부(□)로 나온다. 구현은 `certificate/document/CertificatePdfRenderer` (#34).
+
+직인 이미지가 없어 `대전광역시 유성구청장 (인)` 글자만 찍는다 (§7-1 2번).
 
 | 대안 | 왜 안 씀 |
 |---|---|
@@ -225,7 +231,11 @@ implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.28'
 
 ### 4-2. 저장
 
-생성 PDF는 `S3Uploader`로 올리고 `certificates_issued.file_path`에 key를 넣는다. 다운로드(§5.5)는 그 key로 받아서 스트리밍한다.
+생성 PDF는 `S3Uploader`로 올리고 `certificates_issued.file_path`에 key(`certificates/issued/{연도}/{문서번호}.pdf`)를 넣는다. 다운로드(§5.5)는 그 key로 받아서 스트리밍한다.
+
+- **렌더나 업로드가 실패하면 발급도 실패한다** (렌더 500 `CERTIFICATE_RENDER_FAILED`, 업로드 502 `STORAGE_FAILURE`). 파일 없는 발급 건이 201로 나가면 다운로드가 404라 재발급만 반복된다 (#34).
+- 업로드 뒤 트랜잭션이 롤백되면 트랜잭션 완료 콜백에서 S3 객체를 지운다.
+- #34 이전에 발급된 건은 `file_path`가 null이고 그대로 404다. 지금 데이터로 소급 렌더하면 발급 당시 내용이 아니게 돼 불변 원칙이 깨진다.
 
 재발급 시 매번 새로 렌더하지 않는다 — 발급된 증명서는 **불변**이어야 한다. 원본 데이터가 나중에 수정돼도 이미 발급된 PDF는 그대로여야 하므로, `file_path`가 있으면 그걸 내려준다.
 
@@ -285,7 +295,37 @@ Response `201`
 
 ### 5.2 POST `/api/certificates/self` — 발급 (민원인 본인)
 
-**구현하지 않는다.** 본인이 누구인지 아는 수단이 없다 (§7-1). auth 도메인 완료 후 §5.1에 `humanId = 인증주체.humanId`, `certificateIds = 전체`를 넣는 얇은 래퍼로 붙인다. 명세의 403(본인 경력 외 접근)도 그때 같이.
+§5.1의 얇은 래퍼다. `humanId`와 `certificateIds`를 요청이 아니라 인증 주체에서 끌어온다.
+
+Request
+```json
+{ "purpose": "은행 제출용", "otherMatters": "" }
+```
+
+Response `201` — §5.1과 동일
+
+| 상태 | 조건 |
+|---|---|
+| 400 | `purpose` 누락 / 재직 이력 10건 초과 → `CERTIFICATE_LIMIT_EXCEEDED` |
+| 401 | 토큰 없음/무효 |
+| 403 | `PETITIONER` 권한 아님 (`SecurityConfig`) — **현재는 401로 나간다** (#21), §5-7 참고 |
+| 404 | 계정과 일치하는 인적사항 없음 → `PETITIONER_HUMAN_NOT_MATCHED` / 재직 이력 없음 → `CERTIFICATE_NOT_FOUND` |
+
+#### 계정 ↔ 인적사항 매칭
+
+**`Petitioner`에 `human_id` FK가 없다.** `(User.name, Petitioner.birthDate)`로 `humans(name, birth_date)`를 조회해 잇는다 — `uk_humans_name_birth_date`가 1:1을 보장하므로 결과는 최대 1건이다. `PetitionerHumanResolver`가 담당한다.
+
+> 문서 초안에는 "`humanId = 인증주체.humanId`"로 적혀 있었지만, 실제로는 `humanId`를 바로 얻을 수 없고 조회가 한 단계 필요하다.
+
+본인 발급은 이력을 고를 수 없어 **전체**를 넣는다. 서식이 10행이라 10건을 넘으면 400으로 막고 담당자에게 넘긴다.
+
+> ### ⚠️ 이 매칭은 본인임을 증명하지 못한다
+>
+> `SignupService`는 `accountId`/`password`/`name`/`phoneNumber`/`birthDate`를 받아 **아무것도 대조하지 않고** 계정을 만든다. 타인의 성명과 생년월일을 알면 그 명의로 가입해 경력증명서를 발급받을 수 있다.
+>
+> `Petitioner.phoneNumber`와 대조하려 해도 `humans`에 전화번호 컬럼이 없다.
+>
+> **본인인증(휴대폰/PASS 등)이 붙기 전까지 `/self`를 운영 환경에 열면 안 된다.** 권한 제한과 소유권 검사(§5-7)는 "로그인한 그 계정의 것만"을 보장할 뿐, "그 계정이 본인"인지는 보장하지 못한다.
 
 ### 5.3 GET `/api/certificates/{certificateId}` — 상세 조회
 
@@ -336,6 +376,62 @@ Response `200` — 없으면 `[]`
 명세 그대로: **인적사항은 있는데 재직 이력이 없으면 404가 아니라 `200 []`이다.** `humanRepository.existsById()` 먼저 확인하고 목록을 조회한다.
 
 정렬은 `hire_date ASC, certificate_id ASC`. 서식의 재직사항 표가 시간순이므로 여기서도 같은 순서로 준다. `hire_date`가 NULL인 행은 뒤로 (`NULLS LAST`).
+
+### 5-7. 접근 제어
+
+`SecurityConfig`에 경로별 권한을 건다. 이전에는 `anyRequest().authenticated()`뿐이라 **로그인한 민원인이 남의 경력증명서 상세를 그대로 조회할 수 있었다.**
+
+| 경로 | 권한 |
+|---|---|
+| `POST /api/certificates/self` | `PETITIONER` |
+| `GET /api/certificates/*/download` | 인증 + 소유권 검사 (아래) |
+| 그 외 `/api/certificates/**`, `/api/humans/*/certificates` | `ADMIN`, `USER` (민원 담당자) |
+
+다운로드만 담당자와 발급 대상자 둘 다 접근한다(명세의 403). 경로만으로는 판정할 수 없어 `CertificateService.download()`에서 검사한다 — 호출자가 `PETITIONER`면 발급 건의 `humanId`가 본인 것인지 확인하고, 아니면 `NOT_OWN_CERTIFICATE`(403).
+
+> `/api/human/**`(인적사항 CRUD)과 `/api/files/**`는 아직 `authenticated()`뿐이다. 각 도메인 범위라 건드리지 않았다.
+
+> **권한 부족이 403이 아니라 401로 나간다.** `SecurityConfig`가 `authenticationEntryPoint`만 지정하고 `accessDeniedHandler`를 두지 않아, 인증은 됐지만 권한이 없는 요청이 엔트리포인트로 흘러 본문 없는 401이 된다. 기존 `/api/admins`도 같아서 **이 도메인이 만든 문제가 아니다.** 전역 수정이라 별도 이슈(#21)로 뺐다.
+>
+> 서비스가 직접 던지는 403(`NOT_OWN_CERTIFICATE`)은 `GlobalExceptionHandler`를 타므로 정상적으로 403이 나간다.
+
+### 5.7 POST `/api/certificates/create` — 개별 등록 (#31)
+
+재직 이력 한 줄 등록. 이게 없으면 경력 행을 만들 수 있는 경로가 엑셀 업로드뿐이라 관리자 앱의
+개별 등록 화면이 아예 동작하지 않았다. 없던 시절엔 `/create`가 `/{certificateId}`에 매칭돼
+`405 Allow: GET, PUT`이 나갔다.
+
+Request
+```json
+{
+  "humanId": 1,
+  "jobTitle": "주무관", "keyResponsibilities": "민원 접수",
+  "hireDate": "2020-01-01", "expirationDate": "2022-03-14", "retirementDate": null,
+  "division": "채용", "department": "총무과",
+  "reason": null, "employmentType": "기간제", "note": null
+}
+```
+
+Response `201` — `{ "certificateId": 1 }`. §5.1의 `certificateIds`에 그대로 넣는 값이다.
+
+| 상태 | 조건 |
+|---|---|
+| 400 | 검증 실패 (`division`/`employmentType` 허용값, `hireDate > retirementDate`) |
+| 401 | 토큰 없음/무효 |
+| 404 | `humanId` 없음 → `HUMAN_NOT_FOUND` |
+
+검증은 §5.6(`CertificateUpdateRequest`)과 같다. `CertificateCodes` 상수를 공유한다.
+
+#### 명세와 다르게 가는 부분
+
+| # | 명세 | 여기 | 이유 |
+|---|---|---|---|
+| 1 | `humanId` 없음 | `@NotNull humanId` | 등록 화면이 `POST /api/human`으로 대상자를 만든 뒤 붙이는 흐름이다. `(name, birthDate, gender)`로 find-or-create 하면 `humans` 유니크 제약·중복 409·`address` 처리를 certificate 도메인에 복제하게 되고, 서식에 인쇄되는 `humans.address`를 채울 방법이 없다 |
+| 2 | `name`/`birthDate`/`gender` 필수 | **안 받는다.** `humans` 행에서 복사 | (a) 성별 표기가 두 벌이다 — `human.entity.Gender`는 `M`/`F`(`@JsonValue`), `certificate.entity.Gender`는 `MALE`/`FEMALE`(Jackson 기본). 한 화면에서 표기가 두 번 바뀌면 프론트가 `M`을 보내는 순간 400이다. (b) §2-1의 `human_id` 백필이 `(name, birth_date)` 일치 전제라, 본문 값이 `humans`와 어긋나면 그 전제가 조용히 깨진다. 프론트가 계속 보내도 Jackson 기본값이 무시하므로 400은 안 난다 |
+| 3 | `department` 없음 | 받는다 (nullable) | 서식에 인쇄되는 칸인데 §1-2 기준 채우는 경로가 하나도 없었다. 여기서 안 받으면 등록 직후 §5.6 PUT을 한 번 더 쳐야 근무부서가 들어간다. **`humans.department`는 상속하지 않는다** — 사람당 하나뿐이라 전보 이력에 반복해 찍으면 틀린 값이 인쇄된다 |
+| 4 | — | 경로에 동사(`/create`) | `POST /api/certificates`를 발급(§5.1)이 이미 쓴다. 명세·프론트가 `/create`로 확정돼 있어 그대로 간다. 리터럴 경로라 `/{certificateId}`보다 먼저 매칭된다 |
+
+`SecurityConfig`는 손대지 않았다 — `/api/certificates/**` → `ADMIN`/`USER`에 이미 걸린다.
 
 ### 5.5 GET `/api/certificates/{certificateId}/download` — 다운로드/출력
 
@@ -435,7 +531,8 @@ public enum CertificateErrorCode implements ErrorProperty {
 |---|---|---|
 | ~~`refactor: certificate 날짜 컬럼 LocalDate 전환`~~ ✅ | `file/excel/RowValidator` | §2-2. 완료 |
 | ~~`refactor: 구분/근무형태 허용값 상수 통합`~~ ✅ | `file/excel/RowValidator` | §5.6. 완료. 상수는 `certificate/entity/CertificateCodes`로 |
-| `build: openhtmltopdf 추가` | `build.gradle` | §4-1. **아직 안 함** — §7-1 2·9번이 풀려야 의미가 있다 |
+| ~~`build: openhtmltopdf 추가`~~ ✅ | `build.gradle` | §4-1. #34에서 추가. 직인(§7-1 2번)은 아직 없음 |
+| `feat: 발급 PDF 업로드` | `global/s3/S3Uploader` | §4-2. 서버에서 만든 `byte[]`를 정해진 key로 올리는 `upload` 오버로드 |
 
 ---
 
@@ -445,7 +542,7 @@ public enum CertificateErrorCode implements ErrorProperty {
 
 | # | 내용 | 영향 |
 |---|---|---|
-| 1 | **인증 미구현** — `SecurityConfig`가 `anyRequest().permitAll()` | 401/403 전부 구현 불가. `POST /self`(§5.2) 전체 보류. 서식의 `담당자`/`연락처` 칸도 채울 수 없다 |
+| 1 | ~~인증 미구현~~ **부분 해소** (#8 머지) | 401/403, `/self`(§5.2), 접근 제어(§5-7) 구현 완료. **다만 회원가입에 신원 검증이 없다 — §5.2 경고 참고.** 서식의 `담당자`/`연락처` 칸은 여전히 못 채운다 (발급 주체를 `certificates_issued`에 저장하지 않음) |
 | 2 | **유성구청장 직인 이미지 없음** | 발급물이 무효다. PNG(투명 배경) 확보 필요. 코드로 못 푼다 |
 | 3 | **근무부서 데이터 원천 부재** (§1-2) | `certificate.department` 컬럼은 추가됨. 채울 데이터가 없어 서식 칸 공란 출력. 유성구청 담당자에게 원천 확인 요청 |
 | 4 | **성명(영문) 없음** | 공란 출력. 필요하면 `humans`에 `name_en` 추가 |
@@ -453,9 +550,9 @@ public enum CertificateErrorCode implements ErrorProperty {
 | 6 | 근무기간 구간 중복 (§3-2) | 원본 데이터 확인 필요. 확인 전까지 단순 합산 |
 | 7 | 마이그레이션 도구 없음 | §2 DDL 수동 적용. **`certificate` 백필(§2-1)은 되돌리기 어려우니 배포 전 스테이징에서 먼저** |
 | 8 | **총 근무기간 산정 기준 미확인** (§3-2) | 1개월 = 30일로 구현. 유성구청 기준이 다르면 `WorkPeriodCalculator.DAYS_PER_MONTH` 한 줄 |
-| 9 | **한글 폰트 파일 없음** | PDF 렌더링 시 전부 두부(□). 나눔고딕 등 `.ttf` 필요 (§4-1) |
+| 9 | ~~한글 폰트 파일 없음~~ ✅ **해소** (#34) | 나눔고딕(OFL) 임베드 (§4-1) |
 
-1~4, 8~9는 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
+1~4, 8은 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
 
 ### 7-2. 테스트 범위
 
@@ -464,7 +561,8 @@ public enum CertificateErrorCode implements ErrorProperty {
 | 테스트 | 상태 |
 |---|---|
 | `WorkPeriodCalculatorTest` (순수 JUnit) | **있음** — 양끝 포함, 여러 구간 합산, 만료예정일 대체, 끝나는 날 없음, 채용일 없음, 역전 구간, 윤년, 빈 목록 (8건) |
-| `CertificateIssueServiceTest` (Mockito) | **있음** — 인적사항 404, 남의 이력 404, 중복 id 정규화, 총 근무기간 저장 (4건) |
+| `CertificateIssueServiceTest` (Mockito) | **있음** — 인적사항 404, 남의 이력 404, 중복 id 정규화, 총 근무기간 저장, PDF key 저장, 렌더/업로드 실패 시 미발급, 롤백 시 S3 삭제, 커밋 시 유지 (9건) |
+| `CertificatePdfRendererTest` (순수 JUnit + PDFBox) | **있음** — 한글 텍스트 추출, 마크업 이스케이프, 10행 한 장 (3건) |
 | `DocumentNumberGeneratorTest` (`@DataJpaTest`) | **없음** — §7-3에서 수동 검증으로 대신했다 |
 | `CertificateControllerTest` (`@WebMvcTest`) | **없음** — 같음 |
 
