@@ -212,10 +212,12 @@ Period.between(from, to.plusDays(1));  // 재직일수는 양끝 포함
 **서식 파일은 레이아웃 명세로만 쓰고**, 같은 레이아웃의 XHTML을 만들어 PDF로 렌더한다. 서식은 표 3개 + 텍스트뿐이라 재현이 어렵지 않다.
 
 ```
-implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.28'
+implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.87'
 ```
 
-**새로 추가하는 의존성은 이거 하나.** 한글 폰트(나눔고딕 등) `.ttf`를 `src/main/resources/fonts/`에 넣고 `@font-face`로 임베드해야 한다 — 안 하면 전부 두부(□)로 나온다.
+**새로 추가하는 의존성은 이거 하나.** 한글 폰트는 나눔고딕(OFL) Regular/Bold `.ttf`를 `src/main/resources/fonts/`에 넣고 `PdfRendererBuilder.useFont`로 임베드한다 — 안 하면 전부 두부(□)로 나온다. 구현은 `certificate/document/CertificatePdfRenderer` (#34).
+
+직인 이미지가 없어 `대전광역시 유성구청장 (인)` 글자만 찍는다 (§7-1 2번).
 
 | 대안 | 왜 안 씀 |
 |---|---|
@@ -227,7 +229,11 @@ implementation 'io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.28'
 
 ### 4-2. 저장
 
-생성 PDF는 `S3Uploader`로 올리고 `certificates_issued.file_path`에 key를 넣는다. 다운로드(§5.5)는 그 key로 받아서 스트리밍한다.
+생성 PDF는 `S3Uploader`로 올리고 `certificates_issued.file_path`에 key(`certificates/issued/{연도}/{문서번호}.pdf`)를 넣는다. 다운로드(§5.5)는 그 key로 받아서 스트리밍한다.
+
+- **렌더나 업로드가 실패하면 발급도 실패한다** (렌더 500 `CERTIFICATE_RENDER_FAILED`, 업로드 502 `STORAGE_FAILURE`). 파일 없는 발급 건이 201로 나가면 다운로드가 404라 재발급만 반복된다 (#34).
+- 업로드 뒤 트랜잭션이 롤백되면 트랜잭션 완료 콜백에서 S3 객체를 지운다.
+- #34 이전에 발급된 건은 `file_path`가 null이고 그대로 404다. 지금 데이터로 소급 렌더하면 발급 당시 내용이 아니게 돼 불변 원칙이 깨진다.
 
 재발급 시 매번 새로 렌더하지 않는다 — 발급된 증명서는 **불변**이어야 한다. 원본 데이터가 나중에 수정돼도 이미 발급된 PDF는 그대로여야 하므로, `file_path`가 있으면 그걸 내려준다.
 
@@ -523,7 +529,8 @@ public enum CertificateErrorCode implements ErrorProperty {
 |---|---|---|
 | ~~`refactor: certificate 날짜 컬럼 LocalDate 전환`~~ ✅ | `file/excel/RowValidator` | §2-2. 완료 |
 | ~~`refactor: 구분/근무형태 허용값 상수 통합`~~ ✅ | `file/excel/RowValidator` | §5.6. 완료. 상수는 `certificate/entity/CertificateCodes`로 |
-| `build: openhtmltopdf 추가` | `build.gradle` | §4-1. **아직 안 함** — §7-1 2·9번이 풀려야 의미가 있다 |
+| ~~`build: openhtmltopdf 추가`~~ ✅ | `build.gradle` | §4-1. #34에서 추가. 직인(§7-1 2번)은 아직 없음 |
+| `feat: 발급 PDF 업로드` | `global/s3/S3Uploader` | §4-2. 서버에서 만든 `byte[]`를 정해진 key로 올리는 `upload` 오버로드 |
 
 ---
 
@@ -541,9 +548,9 @@ public enum CertificateErrorCode implements ErrorProperty {
 | 6 | 근무기간 구간 중복 (§3-2) | 원본 데이터 확인 필요. 확인 전까지 단순 합산 |
 | 7 | 마이그레이션 도구 없음 | §2 DDL 수동 적용. **`certificate` 백필(§2-1)은 되돌리기 어려우니 배포 전 스테이징에서 먼저** |
 | 8 | **총 근무기간 산정 기준 미확인** (§3-2) | 1개월 = 30일로 구현. 유성구청 기준이 다르면 `WorkPeriodCalculator.DAYS_PER_MONTH` 한 줄 |
-| 9 | **한글 폰트 파일 없음** | PDF 렌더링 시 전부 두부(□). 나눔고딕 등 `.ttf` 필요 (§4-1) |
+| 9 | ~~한글 폰트 파일 없음~~ ✅ **해소** (#34) | 나눔고딕(OFL) 임베드 (§4-1) |
 
-1~4, 8~9는 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
+1~4, 8은 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
 
 ### 7-2. 테스트 범위
 
@@ -552,7 +559,8 @@ public enum CertificateErrorCode implements ErrorProperty {
 | 테스트 | 상태 |
 |---|---|
 | `WorkPeriodCalculatorTest` (순수 JUnit) | **있음** — 양끝 포함, 여러 구간 합산, 만료예정일 대체, 끝나는 날 없음, 채용일 없음, 역전 구간, 윤년, 빈 목록 (8건) |
-| `CertificateIssueServiceTest` (Mockito) | **있음** — 인적사항 404, 남의 이력 404, 중복 id 정규화, 총 근무기간 저장 (4건) |
+| `CertificateIssueServiceTest` (Mockito) | **있음** — 인적사항 404, 남의 이력 404, 중복 id 정규화, 총 근무기간 저장, PDF key 저장, 렌더/업로드 실패 시 미발급, 롤백 시 S3 삭제, 커밋 시 유지 (9건) |
+| `CertificatePdfRendererTest` (순수 JUnit + PDFBox) | **있음** — 한글 텍스트 추출, 마크업 이스케이프, 10행 한 장 (3건) |
 | `DocumentNumberGeneratorTest` (`@DataJpaTest`) | **없음** — §7-3에서 수동 검증으로 대신했다 |
 | `CertificateControllerTest` (`@WebMvcTest`) | **없음** — 같음 |
 
