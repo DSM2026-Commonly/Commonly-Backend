@@ -26,7 +26,8 @@ public final class RowValidator {
             return RowResult.skip();
         }
 
-        String name = trimToNull(fieldValues.get("name"));
+        // humans 매칭 키라 NFC로 맞춘다. NFD로 저장된 엑셀(macOS)은 같은 이름이어도 매칭이 안 된다.
+        String name = normalize(fieldValues.get("name"));
         if (name == null) {
             return RowResult.failure("성명이 비어 있습니다");
         }
@@ -56,6 +57,10 @@ public final class RowValidator {
                         "%s 값 '%s'의 날짜 형식을 인식할 수 없습니다".formatted(dateField.getValue(), raw));
             }
             dates.put(dateField.getKey(), parsed);
+        }
+
+        if (dates.get("birthDate") == null) {
+            return RowResult.failure("생년월일이 비어 있습니다");
         }
 
         CertificateEntity certificate = CertificateEntity.builder()

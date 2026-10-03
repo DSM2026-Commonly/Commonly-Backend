@@ -92,7 +92,9 @@ SELECT certificate_id, hire_date, expiration_date, retirement_date FROM certific
     OR retirement_date !~ '^\d{4}-\d{2}-\d{2}$' AND NULLIF(retirement_date, '') IS NOT NULL;
 ```
 
-`human_id`는 **nullable로 둔다.** 엑셀 업로드(`MappingConfirmService`)는 `humans`를 거치지 않고 `certificate`에 바로 넣기 때문에, NOT NULL로 잠그면 기존 업로드 경로가 전부 깨진다. (2)의 백필로 매칭 안 되는 행 = 인적사항이 아직 등록 안 된 사람이고, 그 행은 발급 대상에서 빠진다.
+`human_id`는 **nullable로 둔다.** (2)의 백필로 매칭 안 되는 행 = 인적사항이 아직 등록 안 된 사람이고, 그 행은 발급 대상에서 빠진다.
+
+엑셀 일괄 등록(`MappingConfirmService`)은 #35부터 행마다 (성명, 생년월일)로 `humans`를 찾아 `human_id`를 채운다. 인적사항이 없는 행은 저장하지 않고 `failedRows`로 돌려준다. 그 전에 업로드돼 `human_id`가 NULL로 남은 행은 (2)의 백필을 한 번 더 돌려 보정한다.
 
 ```sql
 -- 백필 후 매칭 실패 행 확인. 0이 아니면 human 등록부터.

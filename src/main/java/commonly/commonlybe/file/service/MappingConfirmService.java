@@ -1,6 +1,7 @@
 package commonly.commonlybe.file.service;
 
 import commonly.commonlybe.certificate.entity.CertificateEntity;
+import commonly.commonlybe.certificate.entity.Gender;
 import commonly.commonlybe.certificate.repository.CertificateRepository;
 import commonly.commonlybe.file.controller.dto.ColumnMapping;
 import commonly.commonlybe.file.controller.dto.FailedRowDto;
@@ -18,13 +19,17 @@ import commonly.commonlybe.file.exception.FileException;
 import commonly.commonlybe.file.repository.FileRepository;
 import commonly.commonlybe.global.error.error_code.FileErrorCode;
 import commonly.commonlybe.global.s3.S3Uploader;
+import commonly.commonlybe.human.entity.HumanEntity;
+import commonly.commonlybe.human.repository.HumanRepository;
 import java.io.ByteArrayInputStream;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +42,7 @@ public class MappingConfirmService {
 
     private final FileRepository fileRepository;
     private final CertificateRepository certificateRepository;
+    private final HumanRepository humanRepository;
     private final S3Uploader s3Uploader;
 
     @Value("${app.file.max-rows}")
@@ -62,11 +68,25 @@ public class MappingConfirmService {
 
         List<CertificateEntity> toInsert = new ArrayList<>();
         List<FailedRowDto> failedRows = new ArrayList<>();
+        // 한 사람의 이력이 여러 행에 걸치므로 (성명, 생년월일)당 한 번만 조회한다.
+        Map<HumanKey, Optional<HumanEntity>> humans = new HashMap<>();
 
         for (ParsedRow row : parsedExcel.rows()) {
             Map<String, String> fieldValues = extractFieldValues(row, request.mappings(), columnIndex);
             switch (RowValidator.validate(fieldValues)) {
-                case RowResult.Success success -> toInsert.add(success.certificate());
+                case RowResult.Success success -> {
+                    CertificateEntity certificate = success.certificate();
+                    Optional<HumanEntity> human = humans.computeIfAbsent(
+                            new HumanKey(certificate.getName(), certificate.getBirthDate()),
+                            key -> humanRepository.findByNameAndBirthDate(key.name(), key.birthDate()));
+                    if (human.isPresent()) {
+                        linkHuman(certificate, human.get());
+                        toInsert.add(certificate);
+                    } else {
+                        failedRows.add(new FailedRowDto(row.rowIndex(),
+                                "인적사항이 등록되지 않은 대상자입니다 (성명/생년월일)"));
+                    }
+                }
                 case RowResult.Failure failure -> failedRows.add(new FailedRowDto(row.rowIndex(), failure.reason()));
                 case RowResult.Skip skip -> { }
             }
@@ -75,6 +95,16 @@ public class MappingConfirmService {
         certificateRepository.saveAll(toInsert);
 
         return new MappingConfirmResponse(true, toInsert.size(), failedRows);
+    }
+
+    /**
+     * 조회·발급·수정이 human_id로만 대상을 찾으므로 연결 없이 저장하면 어디에도 안 보인다 (#35).
+     * 엑셀의 성별이 humans와 달라도 humans를 따른다 — 개별 등록(CertificateService.create)과 같은 기준.
+     */
+    private void linkHuman(CertificateEntity certificate, HumanEntity human) {
+        // 이름만 같은 별개 enum이다. human은 M/F로 직렬화하고 certificate는 MALE/FEMALE이다.
+        certificate.linkHuman(human.getHumanId(), human.getName(), human.getBirthDate(),
+                Gender.valueOf(human.getGender().name()));
     }
 
     private ParsedExcel downloadAndParse(String objectKey) {
@@ -123,5 +153,8 @@ public class MappingConfirmService {
             values.put(mapping.targetField(), cellValue);
         }
         return values;
+    }
+
+    private record HumanKey(String name, LocalDate birthDate) {
     }
 }

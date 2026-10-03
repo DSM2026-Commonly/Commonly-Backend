@@ -109,6 +109,17 @@ public class CertificateEntity {
         this.note = note;
     }
 
+    /**
+     * 인적사항과 연결. 성명/생년월일/성별은 humans가 단일 출처라 함께 덮어쓴다.
+     * 근무부서는 사람당 하나뿐이라 상속하지 않는다 (certificate-domain.md §1-2).
+     */
+    public void linkHuman(Long humanId, String name, LocalDate birthDate, Gender gender) {
+        this.humanId = humanId;
+        this.name = name;
+        this.birthDate = birthDate;
+        this.gender = gender;
+    }
+
     /** 서식 근무기간의 "까지". 퇴직일이 없으면 만료예정일, 둘 다 없으면 null(재직 중). */
     public LocalDate workEndDate() {
         return retirementDate != null ? retirementDate : expirationDate;
