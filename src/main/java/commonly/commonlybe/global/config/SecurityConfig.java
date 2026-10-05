@@ -51,6 +51,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/auths/login", "/api/auths/signup").permitAll()
                     .requestMatchers("/api/admin/password").hasAnyAuthority("ADMIN", "USER")
                     .requestMatchers("/api/admin/**", "/api/admins").hasAuthority("ADMIN")
+                    .requestMatchers("/api/human/**", "/api/files/**").hasAnyAuthority("ADMIN", "USER")
                     .requestMatchers("/api/issuance-histories").hasAnyAuthority("ADMIN", "USER");
 
                 // 본인 발급. 담당자는 /api/certificates를 쓴다.

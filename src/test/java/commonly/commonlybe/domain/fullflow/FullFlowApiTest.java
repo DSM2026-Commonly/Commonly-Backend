@@ -2,11 +2,11 @@ package commonly.commonlybe.domain.fullflow;
 
 import commonly.commonlybe.certificate.entity.CertificateEntity;
 import commonly.commonlybe.certificate.repository.CertificateRepository;
-import commonly.commonlybe.domain.admin.domain.Admin;
-import commonly.commonlybe.domain.admin.domain.AdminRole;
-import commonly.commonlybe.domain.admin.domain.repository.AdminRepository;
-import commonly.commonlybe.domain.user.domain.User;
-import commonly.commonlybe.domain.user.domain.repository.UserRepository;
+import commonly.commonlybe.admin.entity.Admin;
+import commonly.commonlybe.admin.entity.AdminRole;
+import commonly.commonlybe.admin.repository.AdminRepository;
+import commonly.commonlybe.user.entity.User;
+import commonly.commonlybe.user.repository.UserRepository;
 import commonly.commonlybe.human.entity.Gender;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -139,8 +139,9 @@ class FullFlowApiTest {
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk());
 
-        // GET /api/certificates/{id}는 발급 건 상세라 미발급 상태에서는 404
-        mockMvc.perform(get("/api/certificates/" + cert.getCertificateId())
+        // GET /api/certificates/{id}는 발급 건 id 기준이라 없는 발급 건은 404.
+        // 재직 이력 id를 넣으면 같은 H2를 쓰는 다른 테스트의 발급 건과 id가 겹칠 수 있다.
+        mockMvc.perform(get("/api/certificates/999999")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isNotFound());
 
