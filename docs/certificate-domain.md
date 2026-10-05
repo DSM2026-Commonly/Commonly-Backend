@@ -151,7 +151,7 @@ CREATE TABLE document_number_seq (
 );
 ```
 
-> ⚠️ **`document_number_seq`는 JPA 엔티티가 아니다.** 네이티브 SQL로만 접근하므로 `ddl-auto`가 만들지도 않고 `validate`가 부재를 잡아내지도 못한다. **빠뜨리면 앱은 정상 기동하고 첫 발급 요청에서 500이 난다.** 검증 중 실제로 밟았다.
+> ⚠️ **`document_number_seq`는 JPA 엔티티가 아니다.** 네이티브 SQL로만 접근하므로 `ddl-auto`가 만들지도 않고 `validate`가 부재를 잡아내지도 못한다. **빠뜨리면 앱은 정상 기동하고 첫 발급 요청에서 500이 난다.** 검증 중 실제로 밟았다. → `src/main/resources/schema.sql` + `spring.sql.init.mode: always`로 기동 시 `IF NOT EXISTS` 생성한다.
 
 전용 엔티티(`CertificateIssuedItemEntity`) 대신 `CertificateIssuedEntity`의 `@ElementCollection` + `@OrderColumn`으로 잡았다. 이 목록은 발급 건 밖에서 조회될 일이 없어서 엔티티 + 리포지토리 한 벌이 통째로 필요 없다.
 
