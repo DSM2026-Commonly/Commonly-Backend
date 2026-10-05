@@ -46,6 +46,18 @@ public class CertificateController {
         return certificateIssueService.issue(request);
     }
 
+    /**
+     * 발급 전 미리보기. 발급과 같은 body를 받아 PDF를 inline으로 돌려준다. 문서번호·발급 건은 만들지 않는다.
+     * 리터럴 경로라 /{certificateId} 패턴보다 먼저 매칭된다.
+     */
+    @PostMapping("/preview")
+    public ResponseEntity<Resource> preview(@RequestBody @Valid CertificateIssueRequest request) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(new ByteArrayResource(certificateIssueService.preview(request)));
+    }
+
     /** 발급 대상과 재직 이력을 요청이 아니라 인증 주체에서 끌어온다. */
     @PostMapping("/self")
     @ResponseStatus(HttpStatus.CREATED)
