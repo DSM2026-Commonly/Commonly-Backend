@@ -359,7 +359,8 @@ Response `201` — §5.1과 동일
 Response `200` — 없으면 `[]`
 ```json
 [
-  { "certificateId": 1, "division": "채용", "employmentType": "기간제",
+  { "certificateId": 1, "division": "채용", "department": "총무과",
+    "employmentType": "기간제", "jobTitle": "주무관",
     "keyResponsibilities": "string", "hireDate": "2020-01-01",
     "retirementDate": "2022-03-14", "expirationDate": "2022-03-14",
     "reason": "string", "note": "string" }
@@ -376,6 +377,21 @@ Response `200` — 없으면 `[]`
 명세 그대로: **인적사항은 있는데 재직 이력이 없으면 404가 아니라 `200 []`이다.** `humanRepository.existsById()` 먼저 확인하고 목록을 조회한다.
 
 정렬은 `hire_date ASC, certificate_id ASC`. 서식의 재직사항 표가 시간순이므로 여기서도 같은 순서로 준다. `hire_date`가 NULL인 행은 뒤로 (`NULLS LAST`).
+
+`department`·`jobTitle`도 내려간다 (§5.3 상세와 같은 `CertificateItemDto`). 외부 명세에는 없지만 실서버·프론트 기준이 맞다 — 명세 쪽을 갱신한다.
+
+### GET `/api/issuance-histories` — 발급 이력 목록
+
+Query: `page`(기본 1, 1부터), `size`(기본 10, `@Max(100)`), `startDate`/`endDate`(ISO 날짜, 선택), `keyword`(선택)
+
+Response `200` — **최상위 배열**. `totalPage`/`totalPages` 같은 페이지 메타는 없다 (명세가 낡음, 프론트는 배열로 받는다).
+```json
+[
+  { "issuanceHistoryId": 1, "documentNo": "string", "humanId": 1,
+    "targetName": "홍길동", "purpose": "string",
+    "totalMonths": 26, "totalDays": 13, "issuedAt": "2026-10-05T10:00:00" }
+]
+```
 
 ### 5-7. 접근 제어
 
