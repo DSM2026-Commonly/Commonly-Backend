@@ -6,18 +6,24 @@
 
 ## 1. 스키마
 
-> ⚠️ `ddl-auto`가 `validate`이므로 **아래 DDL을 먼저 적용해야 앱이 뜬다.** 빠뜨리면 기동 시 `SchemaManagementException`이 난다.
+`src/main/resources/schema.sql`에 넣었으므로 **수동 DDL은 필요 없다.**
 
 ```sql
-CREATE TABLE refresh_token (
+CREATE TABLE IF NOT EXISTS refresh_token (
     refresh_token_id BIGSERIAL PRIMARY KEY,
     account_id       VARCHAR(50)  NOT NULL,
     token            VARCHAR(512) NOT NULL UNIQUE,
     expires_at       TIMESTAMP    NOT NULL
 );
 
-CREATE INDEX idx_refresh_token_account_id ON refresh_token(account_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_token_account_id ON refresh_token(account_id);
 ```
+
+`refresh_token`은 JPA 엔티티라 `ddl-auto`가 알고는 있지만, `validate` 모드에서는 **존재를 확인만 하고 만들어주지 않는다.** 수동 DDL에 맡기면 빠뜨리는 순간 기동이 실패하므로(`document_number_seq`에서 이미 밟은 문제) 같은 방식으로 `schema.sql`에 넣었다.
+
+`spring.sql.init.mode: always` + `IF NOT EXISTS`라 매 기동마다 안전하게 돌고, `defer-datasource-initialization` 기본값이 `false`라 **Hibernate 검증보다 먼저 실행된다.**
+
+> schema.sql 정의가 엔티티와 어긋나면 `validate`가 기동 시 잡아낸다. 드리프트 감지로 쓸 수 있다.
 
 한 계정에 여러 행이 있을 수 있다(기기별 로그인).
 
