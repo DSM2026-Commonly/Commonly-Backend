@@ -54,7 +54,7 @@ public class CertificateIssuedEntity {
     @Column(name = "issued_at", nullable = false)
     private LocalDateTime issuedAt;
 
-    /** S3 object key. PDF 생성 전까지는 null. */
+    /** S3 object key. #34 이전에 발급된 건은 PDF 없이 저장돼 null이다. */
     @Column(name = "file_path", length = 512)
     private String filePath;
 
@@ -72,7 +72,7 @@ public class CertificateIssuedEntity {
     @Builder
     public CertificateIssuedEntity(Long humanId, String documentNo, String purpose, String otherMatters,
                                     int totalMonths, int totalDays, LocalDateTime issuedAt,
-                                    List<Long> certificateIds) {
+                                    String filePath, List<Long> certificateIds) {
         this.humanId = humanId;
         this.documentNo = documentNo;
         this.purpose = purpose;
@@ -80,6 +80,7 @@ public class CertificateIssuedEntity {
         this.totalMonths = totalMonths;
         this.totalDays = totalDays;
         this.issuedAt = issuedAt;
+        this.filePath = filePath;
         this.certificateIds = new ArrayList<>(certificateIds);
     }
 }

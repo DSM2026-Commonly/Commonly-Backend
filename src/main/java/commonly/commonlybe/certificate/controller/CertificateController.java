@@ -1,8 +1,11 @@
 package commonly.commonlybe.certificate.controller;
 
+import commonly.commonlybe.certificate.controller.dto.CertificateCreateRequest;
+import commonly.commonlybe.certificate.controller.dto.CertificateCreateResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateDetailResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueRequest;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueResponse;
+import commonly.commonlybe.certificate.controller.dto.CertificateItemDto;
 import commonly.commonlybe.certificate.controller.dto.CertificateUpdateRequest;
 import commonly.commonlybe.certificate.controller.dto.SelfCertificateIssueRequest;
 import commonly.commonlybe.certificate.service.CertificateIssueService;
@@ -11,6 +14,7 @@ import commonly.commonlybe.certificate.service.SelfCertificateIssueService;
 import commonly.commonlybe.global.security.auth.AuthDetails;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -44,12 +48,44 @@ public class CertificateController {
         return certificateIssueService.issue(request);
     }
 
-    /** 발급 대상과 재직 이력을 요청이 아니라 인증 주체에서 끌어온다. */
+    /**
+     * 발급 전 미리보기. 발급과 같은 body를 받아 PDF를 inline으로 돌려준다. 문서번호·발급 건은 만들지 않는다.
+     * 리터럴 경로라 /{certificateId} 패턴보다 먼저 매칭된다.
+     */
+    @PostMapping("/preview")
+    public ResponseEntity<Resource> preview(@RequestBody @Valid CertificateIssueRequest request) {
+        return inlinePdf(certificateIssueService.preview(request));
+    }
+
+    /** 본인 재직 이력 목록. 선택 발급 화면용. 리터럴 경로라 /{certificateId} 패턴보다 먼저 매칭된다. */
+    @GetMapping("/self")
+    public List<CertificateItemDto> findMine(@AuthenticationPrincipal AuthDetails authDetails) {
+        return selfCertificateIssueService.findMine(authDetails);
+    }
+
+    /** 발급 대상을 요청이 아니라 인증 주체에서 끌어온다. 재직 이력은 고른 것, 안 골랐으면 전체. */
     @PostMapping("/self")
     @ResponseStatus(HttpStatus.CREATED)
     public CertificateIssueResponse issueSelf(@AuthenticationPrincipal AuthDetails authDetails,
                                               @RequestBody @Valid SelfCertificateIssueRequest request) {
         return selfCertificateIssueService.issue(authDetails, request);
+    }
+
+    /** 본인 발급 미리보기. 본인 발급과 같은 body로 PDF를 inline으로 돌려준다. 문서번호·발급 건은 만들지 않는다. */
+    @PostMapping("/self/preview")
+    public ResponseEntity<Resource> previewSelf(@AuthenticationPrincipal AuthDetails authDetails,
+                                                @RequestBody @Valid SelfCertificateIssueRequest request) {
+        return inlinePdf(selfCertificateIssueService.preview(authDetails, request));
+    }
+
+    /**
+     * 재직 이력 한 줄 등록. 발급이 이미 POST /api/certificates를 쓰고 있어 경로에 동사가 들어갔다.
+     * 리터럴 경로라 /{certificateId} 패턴보다 먼저 매칭된다.
+     */
+    @PostMapping("/create")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CertificateCreateResponse create(@RequestBody @Valid CertificateCreateRequest request) {
+        return certificateService.create(request);
     }
 
     @GetMapping("/{certificateId}")
@@ -76,5 +112,12 @@ public class CertificateController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(new ByteArrayResource(file.content()));
+    }
+
+    private static ResponseEntity<Resource> inlinePdf(byte[] pdf) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(new ByteArrayResource(pdf));
     }
 }

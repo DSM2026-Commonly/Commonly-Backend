@@ -51,11 +51,12 @@ public class SecurityConfig {
                     .requestMatchers("/api/auths/login", "/api/auths/signup", "/api/auths/reissue").permitAll()
                     .requestMatchers("/api/admin/password").hasAnyAuthority("ADMIN", "USER")
                     .requestMatchers("/api/admin/**", "/api/admins").hasAuthority("ADMIN")
+                    .requestMatchers("/api/human/**", "/api/files/**").hasAnyAuthority("ADMIN", "USER")
                     .requestMatchers("/api/issuance-histories").hasAnyAuthority("ADMIN", "USER");
 
-                // 본인 발급. 담당자는 /api/certificates를 쓴다.
+                // 본인 이력 조회(GET)·발급(POST)·미리보기. 담당자는 /api/certificates를 쓴다.
                 // 신원 검증이 붙기 전까지는 기본 차단이고, 명시적으로 켠 환경에서만 열린다.
-                var selfIssue = auth.requestMatchers(HttpMethod.POST, "/api/certificates/self");
+                var selfIssue = auth.requestMatchers("/api/certificates/self", "/api/certificates/self/preview");
                 if (selfIssueEnabled) {
                     selfIssue.hasAuthority("PETITIONER");
                 } else {

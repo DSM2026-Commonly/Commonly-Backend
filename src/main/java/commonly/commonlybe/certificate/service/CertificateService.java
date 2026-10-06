@@ -1,11 +1,14 @@
 package commonly.commonlybe.certificate.service;
 
+import commonly.commonlybe.certificate.controller.dto.CertificateCreateRequest;
+import commonly.commonlybe.certificate.controller.dto.CertificateCreateResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateDetailResponse;
 import commonly.commonlybe.certificate.controller.dto.CertificateHumanDto;
 import commonly.commonlybe.certificate.controller.dto.CertificateItemDto;
 import commonly.commonlybe.certificate.controller.dto.CertificateUpdateRequest;
 import commonly.commonlybe.certificate.entity.CertificateEntity;
 import commonly.commonlybe.certificate.entity.CertificateIssuedEntity;
+import commonly.commonlybe.certificate.entity.Gender;
 import commonly.commonlybe.certificate.exception.CertificateErrorCode;
 import commonly.commonlybe.certificate.exception.CertificateException;
 import commonly.commonlybe.certificate.repository.CertificateIssuedRepository;
@@ -58,6 +61,39 @@ public class CertificateService {
         return certificateRepository.findAllByHumanIdOrderByHireDateAscCertificateIdAsc(humanId).stream()
                 .map(CertificateItemDto::from)
                 .toList();
+    }
+
+    /**
+     * 개별 등록. 인적사항은 humans가 단일 출처라 요청 본문이 아니라 조회한 행에서 복사한다
+     * (CertificateCreateRequest 주석 참고).
+     *
+     * humans.department는 일부러 안 가져온다. 사람당 하나뿐이라 전보 이력에 반복해 찍으면
+     * 증명서에 틀린 근무부서가 인쇄된다 (certificate-domain.md §1-2).
+     */
+    @Transactional
+    public CertificateCreateResponse create(CertificateCreateRequest request) {
+        HumanEntity human = humanRepository.findById(request.humanId())
+                .orElseThrow(() -> new HumanException(HumanErrorCode.HUMAN_NOT_FOUND));
+
+        CertificateEntity certificate = certificateRepository.save(CertificateEntity.builder()
+                .humanId(human.getHumanId())
+                .name(human.getName())
+                .birthDate(human.getBirthDate())
+                // 이름만 같은 별개 enum이다. human은 M/F로 직렬화하고 certificate는 MALE/FEMALE이다.
+                .gender(Gender.valueOf(human.getGender().name()))
+                .jobTitle(request.jobTitle())
+                .keyResponsibilities(request.keyResponsibilities())
+                .hireDate(request.hireDate())
+                .expirationDate(request.expirationDate())
+                .retirementDate(request.retirementDate())
+                .division(request.division())
+                .department(request.department())
+                .reason(request.reason())
+                .employmentType(request.employmentType())
+                .note(request.note())
+                .build());
+
+        return new CertificateCreateResponse(certificate.getCertificateId());
     }
 
     @Transactional
