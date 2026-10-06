@@ -2,10 +2,10 @@ package commonly.commonlybe.certificate.controller;
 
 import commonly.commonlybe.certificate.controller.dto.IssuanceHistoryResponse;
 import commonly.commonlybe.certificate.service.QueryIssuanceHistoryService;
+import commonly.commonlybe.global.page.PageResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +20,7 @@ public class IssuanceHistoryController {
     private final QueryIssuanceHistoryService queryIssuanceHistoryService;
 
     @GetMapping
-    public List<IssuanceHistoryResponse> queryIssuanceHistories(
+    public PageResponse<IssuanceHistoryResponse> queryIssuanceHistories(
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
