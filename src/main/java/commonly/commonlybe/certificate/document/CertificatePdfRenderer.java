@@ -12,7 +12,6 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -126,16 +125,12 @@ public class CertificatePdfRenderer {
             html.append("</tr>");
         }
 
-        // 서식에 퇴직사유 칸이 하나뿐이라 행별 사유를 중복 없이 이어 찍는다.
-        String reasons = certificates.stream()
-                .map(CertificateEntity::getReason)
-                .filter(reason -> reason != null && !reason.isBlank())
-                .distinct()
-                .collect(Collectors.joining(", "));
+        // 서식에 퇴직사유 칸이 하나뿐이라 마지막(가장 최근 입사) 이력의 사유만 찍는다. 목록은 hire_date 오름차순이다.
+        String reason = certificates.isEmpty() ? null : certificates.get(certificates.size() - 1).getReason();
         html.append("<tr><td class=\"label\">총 근무<br/>기간</td><td class=\"total\" colspan=\"2\">총 ")
                 .append(document.total().months()).append(" 개월 ")
                 .append(document.total().days()).append(" 일</td>")
-                .append("<td class=\"label\">퇴직사유</td><td>").append(escape(reasons)).append("</td></tr>");
+                .append("<td class=\"label\">퇴직사유</td><td>").append(escape(reason)).append("</td></tr>");
         html.append("<tr><td class=\"label\">그 밖의<br/>사항</td><td class=\"left\" colspan=\"4\">")
                 .append(multiline(document.otherMatters())).append("</td></tr>");
         html.append("<tr><td class=\"label\">용 도</td><td class=\"left\" colspan=\"4\">")

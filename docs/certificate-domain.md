@@ -27,7 +27,7 @@
 | 재직사항 · 근무부서 | `certificate.department` | certificate | 컬럼만 있음, **데이터 없음** → §1-2 |
 | 재직사항 · 담당업무 | `certificate.key_responsibilities` | certificate | 있음 |
 | 총 근무기간 `총  개월  일` | 계산값 | 위 근무기간 합산 | 계산 필요 (§3) |
-| 퇴직사유 (총 근무기간 행 한 칸) | `certificate.reason` 중복 제거 후 `, `로 이어 붙임 | certificate | 있음 |
+| 퇴직사유 (총 근무기간 행 한 칸) | 마지막 이력(`hire_date` 가장 늦은 행)의 `certificate.reason` | certificate | 있음 |
 | 그 밖의 사항 | `otherMatters` | 발급 요청 body | 저장 안 됨 → §1-3 |
 | 용도 | `purpose` | 발급 요청 body | 저장 안 됨 → §1-3 |
 | `202 .  .  .` | 발급일 | 발급 시각 | — |
