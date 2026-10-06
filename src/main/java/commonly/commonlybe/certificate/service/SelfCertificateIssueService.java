@@ -59,13 +59,18 @@ public class SelfCertificateIssueService {
         return certificateIssueService.preview(toIssueRequest(authDetails, request));
     }
 
+    /**
+     * 발급 사유(issueReason)는 null로 넘긴다. 발급 사유는 담당자가 "남의 증명서를 왜 뽑았는지"를 남기는
+     * 감사 기록이고(#46), 본인 발급은 신청자와 대상자가 같아 그 기록이 의미가 없다.
+     * 본인 발급 화면에도 사유 입력란이 없으므로 SelfCertificateIssueRequest에는 필드를 두지 않는다.
+     */
     private CertificateIssueRequest toIssueRequest(AuthDetails authDetails, SelfCertificateIssueRequest request) {
         HumanEntity human = resolveHuman(authDetails);
 
         // 고른 게 있으면 그대로 넘긴다. 소유권은 CertificateIssueService가 humanId로 검사한다.
         if (request.certificateIds() != null && !request.certificateIds().isEmpty()) {
             return new CertificateIssueRequest(
-                    human.getHumanId(), request.certificateIds(), request.purpose(), request.otherMatters());
+                    human.getHumanId(), request.certificateIds(), request.purpose(), request.otherMatters(), null);
         }
 
         List<Long> certificateIds =
@@ -83,7 +88,7 @@ public class SelfCertificateIssueService {
         }
 
         return new CertificateIssueRequest(
-                human.getHumanId(), certificateIds, request.purpose(), request.otherMatters());
+                human.getHumanId(), certificateIds, request.purpose(), request.otherMatters(), null);
     }
 
     private HumanEntity resolveHuman(AuthDetails authDetails) {

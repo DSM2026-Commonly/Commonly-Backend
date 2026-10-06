@@ -45,6 +45,17 @@ public class CertificateIssuedEntity {
     @Column(name = "other_matters", columnDefinition = "TEXT")
     private String otherMatters;
 
+    /**
+     * 담당자가 발급 2단계에서 적는 발급 사유. purpose(용도)와 달리 서식에 찍히지 않고 발급 이력에만 남는다 (#46).
+     * certificate.reason(퇴직사유)과는 아무 관계가 없다.
+     *
+     * nullable이다. #46 이전에 발급된 건에는 값이 없고, NOT NULL로 올리면 기존 데이터가 validate를 통과하지 못한다.
+     *
+     * ponytail: purpose와 같은 값인지 FE 확인 대기 중이다. 같은 값이라면 이 컬럼을 지우고 purpose를 쓰면 된다.
+     */
+    @Column(name = "issue_reason", columnDefinition = "TEXT")
+    private String issueReason;
+
     @Column(name = "total_months", nullable = false)
     private int totalMonths;
 
@@ -71,12 +82,13 @@ public class CertificateIssuedEntity {
 
     @Builder
     public CertificateIssuedEntity(Long humanId, String documentNo, String purpose, String otherMatters,
-                                    int totalMonths, int totalDays, LocalDateTime issuedAt,
+                                    String issueReason, int totalMonths, int totalDays, LocalDateTime issuedAt,
                                     String filePath, List<Long> certificateIds) {
         this.humanId = humanId;
         this.documentNo = documentNo;
         this.purpose = purpose;
         this.otherMatters = otherMatters;
+        this.issueReason = issueReason;
         this.totalMonths = totalMonths;
         this.totalDays = totalDays;
         this.issuedAt = issuedAt;

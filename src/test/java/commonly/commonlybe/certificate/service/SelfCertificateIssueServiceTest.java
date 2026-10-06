@@ -75,7 +75,7 @@ class SelfCertificateIssueServiceTest {
                 ArgumentCaptor.forClass(CertificateIssueRequest.class);
         verify(certificateIssueService).issue(captor.capture());
         org.assertj.core.api.Assertions.assertThat(captor.getValue())
-                .isEqualTo(new CertificateIssueRequest(HUMAN_ID, List.of(1L, 2L), "은행 제출용", null));
+                .isEqualTo(new CertificateIssueRequest(HUMAN_ID, List.of(1L, 2L), "은행 제출용", null, null));
     }
 
     @Test
@@ -112,7 +112,7 @@ class SelfCertificateIssueServiceTest {
                 new SelfCertificateIssueRequest("은행 제출용", null, List.of(2L)));
 
         verify(certificateIssueService).issue(
-                new CertificateIssueRequest(HUMAN_ID, List.of(2L), "은행 제출용", null));
+                new CertificateIssueRequest(HUMAN_ID, List.of(2L), "은행 제출용", null, null));
         verifyNoInteractions(certificateRepository);
     }
 
@@ -123,7 +123,7 @@ class SelfCertificateIssueServiceTest {
         selfCertificateIssueService.preview(authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null));
 
         verify(certificateIssueService).preview(
-                new CertificateIssueRequest(HUMAN_ID, List.of(1L, 2L), "은행 제출용", null));
+                new CertificateIssueRequest(HUMAN_ID, List.of(1L, 2L), "은행 제출용", null, null));
         verify(certificateIssueService, never()).issue(any());
     }
 

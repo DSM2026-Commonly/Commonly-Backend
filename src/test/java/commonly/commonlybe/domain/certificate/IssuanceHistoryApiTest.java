@@ -58,8 +58,10 @@ class IssuanceHistoryApiTest {
 
             certificateIssuedRepository.save(CertificateIssuedEntity.builder()
                 .humanId(hong.getHumanId()).documentNo("유성구-2026-000001").purpose("은행 제출")
+                .issueReason("본인 방문 신청")
                 .totalMonths(12).totalDays(3).issuedAt(LocalDateTime.of(2026, 8, 20, 10, 0))
                 .certificateIds(List.of(1L)).build());
+            // #46 이전 발급 건을 흉내 낸다. 사유 없이 저장돼도 이력 조회가 돌아야 한다.
             certificateIssuedRepository.save(CertificateIssuedEntity.builder()
                 .humanId(kim.getHumanId()).documentNo("유성구-2026-000002").purpose("이직 제출")
                 .totalMonths(6).totalDays(0).issuedAt(LocalDateTime.of(2026, 8, 25, 14, 0))
@@ -84,6 +86,27 @@ class IssuanceHistoryApiTest {
             .andExpect(jsonPath("$.content[0].documentNo").value("유성구-2026-000002"))
             .andExpect(jsonPath("$.content[0].targetName").value("김철수"))
             .andExpect(jsonPath("$.content[1].documentNo").value("유성구-2026-000001"));
+    }
+
+    @Test
+    void 발급_이력에_발급_사유가_내려온다() throws Exception {
+        mockMvc.perform(get("/api/issuance-histories")
+                .header("Authorization", "Bearer " + adminToken)
+                .param("keyword", "홍길"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].issueReason").value("본인 방문 신청"))
+            .andExpect(jsonPath("$.content[0].purpose").value("은행 제출"));
+    }
+
+    /** 사유 없이 저장된 기존 발급 건도 목록에서 빠지지 않고 null로 내려간다. */
+    @Test
+    void 발급_사유가_없는_건은_null로_내려온다() throws Exception {
+        mockMvc.perform(get("/api/issuance-histories")
+                .header("Authorization", "Bearer " + adminToken)
+                .param("keyword", "김철수"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].issueReason").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

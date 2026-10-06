@@ -57,6 +57,7 @@ public class CertificateIssueService {
         LocalDateTime issuedAt = LocalDateTime.now();
         String documentNo = documentNumberGenerator.generate(issuedAt.getYear());
 
+        // 발급 사유(issueReason)는 넘기지 않는다. 서식에 발급 사유 칸이 없고, 서식에 찍히는 건 purpose(용도)뿐이다 (#46).
         byte[] pdf = certificatePdfRenderer.render(new CertificateDocument(
                 documentNo, human, certificates, total, request.purpose(), request.otherMatters(),
                 issuedAt.toLocalDate()));
@@ -68,6 +69,7 @@ public class CertificateIssueService {
                 .documentNo(documentNo)
                 .purpose(request.purpose())
                 .otherMatters(request.otherMatters())
+                .issueReason(request.issueReason())
                 .totalMonths(total.months())
                 .totalDays(total.days())
                 .issuedAt(issuedAt)

@@ -10,6 +10,8 @@ public record CertificateDetailResponse(
         LocalDateTime issuedAt,
         String purpose,
         String otherMatters,
+        /** 발급 사유. 서식에는 찍히지 않고 발급 이력 확인용으로만 내려간다 (#46). 기존 발급 건은 null. */
+        String issueReason,
         CertificateHumanDto human,
         int totalMonths,
         int totalDays,
@@ -24,6 +26,7 @@ public record CertificateDetailResponse(
                 issued.getIssuedAt(),
                 issued.getPurpose(),
                 issued.getOtherMatters(),
+                issued.getIssueReason(),
                 human,
                 issued.getTotalMonths(),
                 issued.getTotalDays(),

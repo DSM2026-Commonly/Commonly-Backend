@@ -9,11 +9,15 @@ import java.util.List;
 /**
  * 재직사항 표가 10행 고정이라 certificateIds는 10개까지다.
  * 넘치면 조용히 앞 10개만 찍는 대신 400으로 막는다.
+ *
+ * issueReason은 서식에 찍히지 않고 발급 이력에만 남는 기록용이라 purpose와 달리 선택 필드다 (#46).
+ * 기존 발급 건에 값이 없으므로 필수로 만들 수 없다.
  */
 public record CertificateIssueRequest(
         @NotNull Long humanId,
         @NotEmpty @Size(max = 10) List<Long> certificateIds,
         @NotBlank @Size(max = 255) String purpose,
-        @Size(max = 1000) String otherMatters
+        @Size(max = 1000) String otherMatters,
+        @Size(max = 1000) String issueReason
 ) {
 }
