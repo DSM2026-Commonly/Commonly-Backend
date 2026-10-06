@@ -52,7 +52,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> {
                 auth
-                    .requestMatchers("/api/auths/login", "/api/auths/signup").permitAll()
+                    .requestMatchers("/api/auths/login", "/api/auths/signup", "/api/auths/reissue").permitAll()
                     .requestMatchers("/api/admin/password").hasAnyAuthority("ADMIN", "USER")
                     .requestMatchers("/api/admin/**", "/api/admins").hasAuthority("ADMIN")
                     .requestMatchers("/api/human/**", "/api/files/**").hasAnyAuthority("ADMIN", "USER")

@@ -16,6 +16,7 @@ jwt:
   header: Authorization
   prefix: Bearer
   access-exp: 3600
+  refresh-exp: 1209600
 
 app:
   s3:

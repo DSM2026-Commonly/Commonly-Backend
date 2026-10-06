@@ -2,11 +2,13 @@ package commonly.commonlybe.auth.controller;
 
 import commonly.commonlybe.auth.controller.dto.ChangePasswordRequest;
 import commonly.commonlybe.auth.controller.dto.LoginRequest;
+import commonly.commonlybe.auth.controller.dto.ReissueRequest;
 import commonly.commonlybe.auth.controller.dto.SignupRequest;
 import commonly.commonlybe.auth.controller.dto.UpdateAccountRequest;
 import commonly.commonlybe.auth.controller.dto.TokenResponse;
 import commonly.commonlybe.auth.service.ChangePasswordService;
 import commonly.commonlybe.auth.service.LoginService;
+import commonly.commonlybe.auth.service.ReissueService;
 import commonly.commonlybe.auth.service.SignupService;
 import commonly.commonlybe.auth.service.UpdateAccountService;
 import commonly.commonlybe.global.security.auth.AuthDetails;
@@ -30,6 +32,7 @@ public class AuthController {
     private final SignupService signupService;
     private final ChangePasswordService changePasswordService;
     private final UpdateAccountService updateAccountService;
+    private final ReissueService reissueService;
 
     @PostMapping("/login")
     public TokenResponse login(@RequestBody @Valid LoginRequest request) {
@@ -40,6 +43,11 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public TokenResponse signup(@RequestBody @Valid SignupRequest request) {
         return signupService.execute(request);
+    }
+
+    @PostMapping("/reissue")
+    public TokenResponse reissue(@RequestBody @Valid ReissueRequest request) {
+        return reissueService.execute(request);
     }
 
     @PatchMapping("/password/{userId}")

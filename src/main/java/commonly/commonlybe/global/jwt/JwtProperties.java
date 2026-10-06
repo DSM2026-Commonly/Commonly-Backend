@@ -11,7 +11,8 @@ public record JwtProperties (
     String secret,
     String header,
     String prefix,
-    Integer accessExp
+    Integer accessExp,
+    Integer refreshExp
 ) {
     public JwtProperties {
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {

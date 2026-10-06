@@ -20,7 +20,7 @@ spring:
 
   sql:
     init:
-      mode: always   # schema.sql: document_number_seq
+      mode: always   # schema.sql: document_number_seq, refresh_token
 
   servlet:
     multipart:
@@ -40,6 +40,8 @@ jwt:
   header: ${JWT_HEADER:Authorization}
   prefix: ${JWT_PREFIX:Bearer}
   access-exp: ${JWT_ACCESS_EXP:3600}
+  # 리프레시 토큰 기본 14일.
+  refresh-exp: ${JWT_REFRESH_EXP:1209600}
 
 app:
   s3:
