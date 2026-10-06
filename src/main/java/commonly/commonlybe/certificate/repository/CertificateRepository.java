@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CertificateRepository extends JpaRepository<CertificateEntity, Long> {
 
+    /** 인적사항 삭제 가드용. human_id가 raw 컬럼이라 JPA가 참조 무결성을 모른다. */
+    boolean existsByHumanId(Long humanId);
+
     /**
      * 서식 재직사항 표가 시간순이므로 조회도 같은 순서로 준다.
      * Postgres는 ASC 기본이 NULLS LAST라 채용일이 빈 행은 뒤로 간다.
