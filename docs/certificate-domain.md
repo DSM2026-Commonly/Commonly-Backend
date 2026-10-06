@@ -106,7 +106,15 @@ SELECT certificate_id, hire_date, expiration_date, retirement_date FROM certific
 
 `human_id`는 **nullable로 둔다.** (2)의 백필로 매칭 안 되는 행 = 인적사항이 아직 등록 안 된 사람이고, 그 행은 발급 대상에서 빠진다.
 
-엑셀 일괄 등록(`MappingConfirmService`)은 #35부터 행마다 (성명, 생년월일)로 `humans`를 찾아 `human_id`를 채운다. 인적사항이 없는 행은 저장하지 않고 `failedRows`로 돌려준다. 그 전에 업로드돼 `human_id`가 NULL로 남은 행은 (2)의 백필을 한 번 더 돌려 보정한다.
+엑셀 일괄 등록(`MappingConfirmService`)은 #35부터 행마다 (성명, 생년월일)로 `humans`를 찾아 `human_id`를 채운다. 그 전에 업로드돼 `human_id`가 NULL로 남은 행은 (2)의 백필을 한 번 더 돌려 보정한다.
+
+#81부터 **인적사항이 없는 행은 실패시키지 않고 `humans`를 만들어 연결한다.** 그 전에는 개별 등록으로 사람을 미리 만들어 두지 않은 엑셀이 통째로 올라가지 않아서, 엑셀만 가진 담당자가 쓸 수 없었다.
+
+엑셀 필수 매핑(`name`/`birthDate`/`gender`)이 `humans`의 NOT NULL 컬럼과 정확히 일치하므로 추가 입력 없이 만들 수 있다. 주소는 선택 매핑(`address`)이고, 매핑하지 않으면 `humans.address`가 NULL로 남아 서식의 주소 칸이 공란으로 찍힌다 — 틀린 주소를 인쇄하는 것보다 낫다. `humans.department`는 채우지 않는다(§1-2).
+
+**이미 있는 인적사항은 엑셀 값으로 덮어쓰지 않는다.** 성별이 달라도 `humans`를 따른다 — 검수된 데이터가 우선이다. 개별 등록(`CertificateService.create`)과 같은 기준이다.
+
+> ⚠️ 대상자 식별 키가 (성명, 생년월일)뿐이다. **성명 오타 한 글자가 별개 인물을 만든다.** 응답의 `createdHumanCount`로 담당자가 확인할 수 있게 해 뒀지만, 동명이인이 같은 생년월일을 가지면 한 사람으로 합쳐지는 한계는 그대로다 (§7-1).
 
 ```sql
 -- 백필 후 매칭 실패 행 확인. 0이 아니면 human 등록부터.

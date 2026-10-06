@@ -58,7 +58,7 @@ public class MappingConfirmService {
         validateMappings(request.mappings(), columnIndex.keySet());
 
         if (!request.confirmed()) {
-            return new MappingConfirmResponse(false, 0, List.of());
+            return new MappingConfirmResponse(false, 0, 0, List.of());
         }
 
         // 확정은 파일당 한 번만 허용한다. 조건부 UPDATE라 동시 요청 중 하나만 통과한다.
@@ -68,24 +68,30 @@ public class MappingConfirmService {
 
         List<CertificateEntity> toInsert = new ArrayList<>();
         List<FailedRowDto> failedRows = new ArrayList<>();
-        // 한 사람의 이력이 여러 행에 걸치므로 (성명, 생년월일)당 한 번만 조회한다.
-        Map<HumanKey, Optional<HumanEntity>> humans = new HashMap<>();
+        // 한 사람의 이력이 여러 행에 걸치므로 (성명, 생년월일)당 한 번만 조회·생성한다.
+        Map<HumanKey, HumanEntity> humans = new HashMap<>();
+        int createdHumanCount = 0;
 
         for (ParsedRow row : parsedExcel.rows()) {
             Map<String, String> fieldValues = extractFieldValues(row, request.mappings(), columnIndex);
             switch (RowValidator.validate(fieldValues)) {
                 case RowResult.Success success -> {
                     CertificateEntity certificate = success.certificate();
-                    Optional<HumanEntity> human = humans.computeIfAbsent(
-                            new HumanKey(certificate.getName(), certificate.getBirthDate()),
-                            key -> humanRepository.findByNameAndBirthDate(key.name(), key.birthDate()));
-                    if (human.isPresent()) {
-                        linkHuman(certificate, human.get());
-                        toInsert.add(certificate);
-                    } else {
-                        failedRows.add(new FailedRowDto(row.rowIndex(),
-                                "인적사항이 등록되지 않은 대상자입니다 (성명/생년월일)"));
+                    HumanKey key = new HumanKey(certificate.getName(), certificate.getBirthDate());
+
+                    HumanEntity human = humans.get(key);
+                    if (human == null) {
+                        human = humanRepository.findByNameAndBirthDate(key.name(), key.birthDate())
+                                .orElse(null);
+                        if (human == null) {
+                            human = createHuman(certificate, trimToNull(fieldValues.get("address")));
+                            createdHumanCount++;
+                        }
+                        humans.put(key, human);
                     }
+
+                    linkHuman(certificate, human);
+                    toInsert.add(certificate);
                 }
                 case RowResult.Failure failure -> failedRows.add(new FailedRowDto(row.rowIndex(), failure.reason()));
                 case RowResult.Skip skip -> { }
@@ -94,7 +100,39 @@ public class MappingConfirmService {
 
         certificateRepository.saveAll(toInsert);
 
-        return new MappingConfirmResponse(true, toInsert.size(), failedRows);
+        return new MappingConfirmResponse(true, toInsert.size(), createdHumanCount, failedRows);
+    }
+
+    /**
+     * 엑셀에만 있는 대상자는 인적사항을 만들어 준다. 전에는 행을 실패시켰는데,
+     * 그러면 개별 등록으로 사람을 먼저 만들어 두지 않은 엑셀은 통째로 올라가지 않았다 (#81).
+     *
+     * 엑셀 필수 매핑(성명/생년월일/성별)이 humans의 NOT NULL 컬럼과 정확히 일치하므로
+     * 추가 입력 없이 만들 수 있다. 주소는 선택 매핑이고, 없으면 null로 두고
+     * 증명서 서식의 주소 칸은 공란으로 찍힌다 — 틀린 주소를 인쇄하는 것보다 낫다.
+     *
+     * department는 채우지 않는다. humans.department는 사람당 한 개라
+     * 기간별 부서를 표현할 수 없고, 재직 이력의 부서는 certificate.department가 따로 갖는다.
+     *
+     * ponytail: 같은 사람이 든 엑셀을 두 담당자가 동시에 확정하면 uk_humans_name_birth_date
+     * 위반으로 트랜잭션이 깨진다. 창구 운영에서는 발생하지 않는다고 보고 재시도를 넣지 않았다.
+     */
+    private HumanEntity createHuman(CertificateEntity certificate, String address) {
+        return humanRepository.save(HumanEntity.builder()
+                .name(certificate.getName())
+                .birthDate(certificate.getBirthDate())
+                // 이름만 같은 별개 enum이다. 상수 이름(MALE/FEMALE)은 양쪽이 같다.
+                .gender(commonly.commonlybe.human.entity.Gender.valueOf(certificate.getGender().name()))
+                .address(address)
+                .build());
+    }
+
+    private static String trimToNull(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

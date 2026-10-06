@@ -46,12 +46,16 @@ class MappingConfirmServiceTest {
 
     private static final Long FILE_ID = 1L;
     private static final Long HUMAN_ID = 10L;
+    private static final Long NEW_HUMAN_ID = 11L;
     private static final String OBJECT_KEY = "excel/upload.xlsx";
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 1, 1);
     private static final List<String> HEADERS = List.of("성명", "생년월일", "성별", "채용일");
     /** 부서 열은 FE가 나중에 추가한 열이다. 기존 서식에는 없어서 별도 헤더로 둔다 (#63). */
     private static final List<String> HEADERS_WITH_DEPARTMENT =
             List.of("성명", "생년월일", "성별", "채용일", "근무부서");
+    /** 주소는 certificate가 아니라 humans로 들어간다 (#81). */
+    private static final List<String> HEADERS_WITH_ADDRESS =
+            List.of("성명", "생년월일", "성별", "채용일", "주소");
 
     @Mock
     private FileRepository fileRepository;
@@ -97,20 +101,115 @@ class MappingConfirmServiceTest {
         verify(humanRepository, times(1)).findByNameAndBirthDate(any(), any());
     }
 
+    /**
+     * 전에는 이 행을 실패시켰다. 그러면 개별 등록으로 사람을 먼저 만들어 두지 않은 엑셀이
+     * 통째로 올라가지 않아서, 엑셀만 가진 담당자가 쓸 수 없었다 (#81).
+     */
     @Test
-    void 인적사항이_없는_대상자는_행_오류로_돌려준다() throws IOException {
+    void 인적사항이_없는_대상자는_인적사항을_만들어_연결한다() throws IOException {
         givenUploadedExcel(List.of(
                 List.of("홍길동", "1990-01-01", "남", "2020-01-01"),
                 List.of("김철수", "1985-05-05", "남", "2021-01-01")));
         given(humanRepository.findByNameAndBirthDate("홍길동", BIRTH_DATE)).willReturn(Optional.of(human()));
         given(humanRepository.findByNameAndBirthDate("김철수", LocalDate.of(1985, 5, 5)))
                 .willReturn(Optional.empty());
+        given(humanRepository.save(any())).willAnswer(invocation -> {
+            HumanEntity created = invocation.getArgument(0);
+            ReflectionTestUtils.setField(created, "humanId", NEW_HUMAN_ID);
+            return created;
+        });
 
         MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequest());
 
-        assertThat(response.insertedCount()).isEqualTo(1);
-        assertThat(response.failedRows()).extracting(FailedRowDto::rowIndex).containsExactly(3);
-        assertThat(captureSaved()).extracting(CertificateEntity::getHumanId).containsExactly(HUMAN_ID);
+        assertThat(response.insertedCount()).isEqualTo(2);
+        assertThat(response.failedRows()).isEmpty();
+        assertThat(response.createdHumanCount()).isEqualTo(1);
+        assertThat(captureSaved()).extracting(CertificateEntity::getHumanId)
+                .containsExactly(HUMAN_ID, NEW_HUMAN_ID);
+
+        HumanEntity created = captureSavedHuman();
+        assertThat(created.getName()).isEqualTo("김철수");
+        assertThat(created.getBirthDate()).isEqualTo(LocalDate.of(1985, 5, 5));
+        assertThat(created.getGender()).isEqualTo(commonly.commonlybe.human.entity.Gender.MALE);
+    }
+
+    @Test
+    void 같은_사람이_여러_행에_있어도_인적사항은_한_번만_만든다() throws IOException {
+        givenUploadedExcel(List.of(
+                List.of("김철수", "1985-05-05", "남", "2020-01-01"),
+                List.of("김철수", "1985-05-05", "남", "2022-01-01"),
+                List.of("김철수", "1985-05-05", "남", "2024-01-01")));
+        given(humanRepository.findByNameAndBirthDate("김철수", LocalDate.of(1985, 5, 5)))
+                .willReturn(Optional.empty());
+        given(humanRepository.save(any())).willAnswer(invocation -> {
+            HumanEntity created = invocation.getArgument(0);
+            ReflectionTestUtils.setField(created, "humanId", NEW_HUMAN_ID);
+            return created;
+        });
+
+        MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequest());
+
+        assertThat(response.insertedCount()).isEqualTo(3);
+        assertThat(response.createdHumanCount()).isEqualTo(1);
+        verify(humanRepository, times(1)).save(any());
+        verify(humanRepository, times(1)).findByNameAndBirthDate(any(), any());
+        assertThat(captureSaved()).extracting(CertificateEntity::getHumanId)
+                .containsExactly(NEW_HUMAN_ID, NEW_HUMAN_ID, NEW_HUMAN_ID);
+    }
+
+    @Test
+    void 이미_있는_인적사항은_엑셀_값으로_덮어쓰지_않는다() throws IOException {
+        // 엑셀 성별이 humans와 달라도 humans를 따른다. 검수된 데이터가 우선이다.
+        givenUploadedExcel(List.of(List.of("홍길동", "1990-01-01", "여", "2020-01-01")));
+        given(humanRepository.findByNameAndBirthDate("홍길동", BIRTH_DATE)).willReturn(Optional.of(human()));
+
+        MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequest());
+
+        assertThat(response.createdHumanCount()).isZero();
+        verify(humanRepository, never()).save(any());
+        assertThat(captureSaved()).singleElement()
+                .satisfies(certificate -> assertThat(certificate.getGender()).isEqualTo(Gender.MALE));
+    }
+
+    @Test
+    void 주소_열을_매핑하면_새로_만든_인적사항에_주소가_들어간다() throws IOException {
+        givenUploadedExcel(HEADERS_WITH_ADDRESS, List.of(
+                List.of("김철수", "1985-05-05", "남", "2020-01-01", "대전 유성구 대학로 1")));
+        given(humanRepository.findByNameAndBirthDate("김철수", LocalDate.of(1985, 5, 5)))
+                .willReturn(Optional.empty());
+        given(humanRepository.save(any())).willAnswer(invocation -> {
+            HumanEntity created = invocation.getArgument(0);
+            ReflectionTestUtils.setField(created, "humanId", NEW_HUMAN_ID);
+            return created;
+        });
+
+        MappingConfirmRequest request = new MappingConfirmRequest(List.of(
+                new ColumnMapping("성명", "name"),
+                new ColumnMapping("생년월일", "birthDate"),
+                new ColumnMapping("성별", "gender"),
+                new ColumnMapping("채용일", "hireDate"),
+                new ColumnMapping("주소", "address")), true);
+
+        mappingConfirmService.confirm(FILE_ID, request);
+
+        assertThat(captureSavedHuman().getAddress()).isEqualTo("대전 유성구 대학로 1");
+    }
+
+    @Test
+    void 주소_열이_없으면_주소는_null로_두고_만든다() throws IOException {
+        // 틀린 주소를 증명서에 인쇄하는 것보다 공란이 낫다
+        givenUploadedExcel(List.of(List.of("김철수", "1985-05-05", "남", "2020-01-01")));
+        given(humanRepository.findByNameAndBirthDate("김철수", LocalDate.of(1985, 5, 5)))
+                .willReturn(Optional.empty());
+        given(humanRepository.save(any())).willAnswer(invocation -> {
+            HumanEntity created = invocation.getArgument(0);
+            ReflectionTestUtils.setField(created, "humanId", NEW_HUMAN_ID);
+            return created;
+        });
+
+        mappingConfirmService.confirm(FILE_ID, confirmRequest());
+
+        assertThat(captureSavedHuman().getAddress()).isNull();
     }
 
     @Test
@@ -270,6 +369,12 @@ class MappingConfirmServiceTest {
         ArgumentCaptor<List<CertificateEntity>> saved = ArgumentCaptor.forClass(List.class);
         verify(certificateRepository).saveAll(saved.capture());
         return saved.getValue();
+    }
+
+    private HumanEntity captureSavedHuman() {
+        ArgumentCaptor<HumanEntity> captor = ArgumentCaptor.forClass(HumanEntity.class);
+        verify(humanRepository).save(captor.capture());
+        return captor.getValue();
     }
 
     private HumanEntity human() {
