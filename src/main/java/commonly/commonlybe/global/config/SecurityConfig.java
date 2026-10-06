@@ -5,6 +5,7 @@ import commonly.commonlybe.global.security.handler.CommonlyAuthenticationEntryPo
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -92,6 +93,11 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));
+        // allowedHeaders는 "요청" 헤더 허용이라 응답 노출과는 다른 축이다. 이걸 "*"로 열어둬도
+        // 교차 출처에서 브라우저 JS가 읽을 수 있는 응답 헤더는 safelist 6개로 막혀 있다.
+        // 경력증명서 다운로드가 문서번호 기반 파일명을 Content-Disposition으로만 내려주므로
+        // 여기서 노출하지 않으면 FE가 파일명을 못 읽고 임의 이름으로 저장한다.
+        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
