@@ -1,5 +1,8 @@
 package commonly.commonlybe.global.config;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -52,5 +55,22 @@ class ServerTimeZoneTest {
 
         assertThat(asDefaultZone.toLocalDate()).isEqualTo(kstJustAfterMidnight.toLocalDate());
         assertThat(asDefaultZone.getYear()).isEqualTo(2026);
+    }
+
+    /**
+     * 운영 시간대는 Dockerfile에서만 정해진다. 애플리케이션 코드에는 고정하는 곳이 없고
+     * 테스트 JVM은 build.gradle이 따로 띄우므로, 이 줄이 사라져도 다른 테스트는 전부 통과한다.
+     * 지워지면 증명서 발급일이 다시 전날로 인쇄되므로 여기서 잡는다 (#76).
+     */
+    @Test
+    void Dockerfile이_운영_시간대를_한국으로_고정한다() throws IOException {
+        String dockerfile = Files.readString(Path.of("Dockerfile"));
+
+        assertThat(dockerfile)
+                .as("컨테이너 TZ")
+                .contains("ENV TZ=Asia/Seoul");
+        assertThat(dockerfile)
+                .as("JVM 플래그 — TZ가 사라져도 받쳐주는 이중 안전망")
+                .contains("-Duser.timezone=Asia/Seoul");
     }
 }
