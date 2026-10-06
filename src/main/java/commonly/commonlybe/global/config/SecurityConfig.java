@@ -1,11 +1,11 @@
 package commonly.commonlybe.global.config;
 
+import commonly.commonlybe.global.security.handler.CommonlyAccessDeniedHandler;
+import commonly.commonlybe.global.security.handler.CommonlyAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,6 +26,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final FilterConfig filterConfig;
+    private final CommonlyAuthenticationEntryPoint authenticationEntryPoint;
+    private final CommonlyAccessDeniedHandler accessDeniedHandler;
 
     /**
      * 본인 발급 스위치. 기본값 false, 운영에서는 끈 채로 둔다.
@@ -44,7 +46,9 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(exception -> exception
-                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                // 미인증은 401, 권한 부족은 403. 둘 다 ErrorResponse 형식의 본문을 보낸다.
+                .authenticationEntryPoint(authenticationEntryPoint)
+                .accessDeniedHandler(accessDeniedHandler)
             )
             .authorizeHttpRequests(auth -> {
                 auth
