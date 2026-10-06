@@ -14,7 +14,11 @@ public interface CertificateIssuedRepository extends JpaRepository<CertificateIs
     /**
      * issuedAt만으로 정렬하면 같은 시각에 발급된 건끼리 순서가 안 정해져
      * 페이지를 넘길 때 같은 행이 두 번 나오거나 빠진다. 유일 키를 2차 정렬로 둔다.
+     * 인적사항 삭제 가드용. human_id가 @ManyToOne이 아닌 raw 컬럼이라
+     * DB/JPA가 참조 무결성을 봐주지 않아 직접 확인해야 한다.
      */
+    boolean existsByHumanId(Long humanId);
+
     @Query("""
             select new commonly.commonlybe.certificate.controller.dto.IssuanceHistoryResponse(
                 i.certificateIssuedId, i.documentNo, i.humanId, h.name, i.purpose,

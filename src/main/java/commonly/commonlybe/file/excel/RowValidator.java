@@ -73,6 +73,9 @@ public final class RowValidator {
                 .expirationDate(dates.get("expirationDate"))
                 .retirementDate(dates.get("retirementDate"))
                 .division(division)
+                // 근무부서는 선택 매핑이다. 열을 안 넣은 기존 엑셀에서는 null로 남고 서식에서 공란으로 찍힌다.
+                // humans.department로 메우지 않는다 — 사람당 한 개라 기간별 부서를 표현할 수 없다.
+                .department(trimToNull(fieldValues.get("department")))
                 .reason(trimToNull(fieldValues.get("reason")))
                 .employmentType(employmentType)
                 .note(trimToNull(fieldValues.get("note")))

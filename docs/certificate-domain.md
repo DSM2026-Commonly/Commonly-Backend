@@ -24,7 +24,7 @@
 | 주 소 | `humans.address` | human | 있음 (nullable) |
 | 재직사항 · 근무기간 `부터` | `certificate.hire_date` | certificate | 있음 (`LocalDate`) |
 | 재직사항 · 근무기간 `까지` | `retirement_date` ?? `expiration_date` | certificate | 있음 (`LocalDate`) |
-| 재직사항 · 근무부서 | `certificate.department` | certificate | 컬럼만 있음, **데이터 없음** → §1-2 |
+| 재직사항 · 근무부서 | `certificate.department` | certificate | 있음 (nullable). 엑셀 업로드의 선택 매핑 → §1-2 |
 | 재직사항 · 담당업무 | `certificate.key_responsibilities` | certificate | 있음 |
 | 총 근무기간 `총  개월  일` | 계산값 | 위 근무기간 합산 | 계산 필요 (§3) |
 | 퇴직사유 | `certificate.reason` | certificate | 있음 |
@@ -41,15 +41,27 @@
 
 `workExperienceIds`가 10개를 넘으면 어떻게 되는지 명세에 없다. 여기서는 **11개 이상이면 400**으로 막는다. 표를 넘겨서 2페이지로 흘리는 건 서식 원형이 깨지고, 조용히 앞 10개만 찍는 건 증명서에서 하면 안 되는 짓이다.
 
-### 1-2. 근무부서는 컬럼만 있고 값이 없다
+### 1-2. 근무부서는 엑셀 업로드로 채운다 (#63)
 
-`certificate.department`(nullable)를 추가해 뒀다. **자리만 잡아둔 것이고 채우는 경로는 아직 없다.**
+`certificate.department`(nullable)에 값을 채우는 경로가 생겼다. 엑셀 업로드의 **선택 매핑 필드**다.
 
-- `certificate.division`은 부서가 아니다. 엑셀 원본의 `구분(채용,전보,해지,퇴직)` 열이고 `RowValidator`가 그 4개 값으로 검증한다.
-- `humans.department`는 **사람당 한 개**라 "2020년엔 총무과, 2023년엔 민원과" 같은 기간별 부서가 표현이 안 된다. 전보(`division = 전보`) 이력이 데이터에 실제로 들어 있는데 부서명이 없다.
-- 원본 엑셀(`기간제 근로자 관리서식.xlsx`)에 부서 열이 없다. 그래서 엑셀 업로드 경로(`ColumnMappingTable`)에는 `department`를 **넣지 않았다.** 매핑 대상 필드로 열어봐야 매핑할 열이 없다.
+먼저 헷갈리기 쉬운 셋을 구분해 둔다. 이게 이 절의 핵심이다.
 
-값을 채우려면 원천 데이터 확보가 먼저다 (§7-1). 그때까지 서식의 근무부서 칸은 **공란으로 출력한다.** `humans.department`를 전 행에 반복해 찍는 건 안 된다 — 틀린 값을 증명서에 인쇄하게 된다.
+- `certificate.division`은 **부서가 아니다.** 엑셀 원본의 `구분(채용,전보,해지,퇴직)` 열이고 `RowValidator`가 그 4개 값으로 검증한다.
+- `certificate.department`가 근무부서다. 서식의 재직사항 · 근무부서 칸에 찍히는 값이고, **재직 이력 행마다 따로** 갖는다.
+- `humans.department`는 **사람당 한 개**라 "2020년엔 총무과, 2023년엔 민원과" 같은 기간별 부서가 표현이 안 된다. 전보(`division = 전보`) 이력이 데이터에 실제로 들어 있다. 그래서 `humans.department`를 재직 이력 전 행에 복사해 넣는 구현은 **하지 않는다** — 틀린 값을 공문서에 인쇄하게 된다. `CertificateEntity.linkHuman()`이 성명/생년월일/성별만 덮어쓰고 부서는 건드리지 않는 이유다.
+
+#### 처음에 `ColumnMappingTable`에서 빼뒀던 이유
+
+원본 엑셀(`기간제 근로자 관리서식.xlsx`)에 **부서 열이 없었다.** 매핑 대상 필드로 열어봐야 사용자가 고를 열이 없으니, 매핑 화면에 쓸 수 없는 선택지만 늘어난다. 그래서 `department`를 `VALID_TARGET_FIELDS`에 넣지 않고 컬럼만 자리를 잡아뒀다. 당시 서식의 근무부서 칸은 공란으로 출력했다.
+
+#### 이제 넣는 이유
+
+**FE가 업로드 서식에 부서 열을 같이 추가하기로 했다.** 열이 실제로 생겼으니 "매핑할 열이 없다"는 전제가 사라졌고, 원천 데이터 확보(§7-1)를 기다릴 이유도 없어졌다. `ColumnMappingTable.VALID_TARGET_FIELDS`에 `department`를 넣고 `RowValidator`가 `CertificateEntity.department`를 채운다.
+
+- **필수가 아니다.** `REQUIRED_TARGET_FIELDS`는 `name`/`birthDate`/`gender` 그대로다. 부서 열이 없는 **기존 운영 엑셀이 계속 올라가야** 하므로 필수로 올리면 안 된다 — 올리면 그 파일이 전부 `REQUIRED_FIELD_NOT_MAPPED`로 거부된다.
+- 열을 매핑하지 않거나 셀이 공란이면 `department`는 **null**이다 (빈 문자열로 넣지 않는다). 그 행의 서식 근무부서 칸은 전과 같이 공란으로 출력된다.
+- `ponytail:` 이미 적재된 기존 행의 `department`는 여전히 NULL이다. 이번 변경은 **앞으로 올라오는 업로드만** 채운다. 과거 행을 메우려면 부서 열이 들어간 파일로 다시 올리거나 별도 백필이 필요하다 — 어느 쪽으로 갈지는 아직 정해지지 않았다.
 
 ### 1-3. `purpose` / `otherMatters`는 저장한다
 
@@ -79,7 +91,7 @@ ALTER TABLE certificate ALTER COLUMN hire_date       TYPE DATE USING NULLIF(hire
 ALTER TABLE certificate ALTER COLUMN retirement_date TYPE DATE USING NULLIF(retirement_date, '')::DATE;
 ALTER TABLE certificate ALTER COLUMN expiration_date TYPE DATE USING NULLIF(expiration_date, '')::DATE;
 
--- (4) 근무부서. §1-2. 채우는 경로는 아직 없다.
+-- (4) 근무부서. §1-2. 엑셀 업로드의 선택 매핑으로 채운다(#63). 기존 행은 NULL로 남는다.
 ALTER TABLE certificate ADD COLUMN department VARCHAR(255);
 ```
 
@@ -615,7 +627,7 @@ public enum CertificateErrorCode implements ErrorProperty {
 |---|---|---|
 | 1 | ~~인증 미구현~~ **부분 해소** (#8 머지) | 401/403, `/self`(§5.2), 접근 제어(§5-7) 구현 완료. **다만 회원가입에 신원 검증이 없다 — §5.2 경고 참고.** 서식의 `담당자`/`연락처` 칸은 여전히 못 채운다 (발급 주체를 `certificates_issued`에 저장하지 않음) |
 | 2 | **유성구청장 직인 이미지 없음** | 발급물이 무효다. PNG(투명 배경) 확보 필요. 코드로 못 푼다 |
-| 3 | **근무부서 데이터 원천 부재** (§1-2) | `certificate.department` 컬럼은 추가됨. 채울 데이터가 없어 서식 칸 공란 출력. 유성구청 담당자에게 원천 확인 요청 |
+| 3 | ~~근무부서 데이터 원천 부재~~ **부분 해소** (#63, §1-2) | FE가 업로드 서식에 부서 열을 추가해서 엑셀 업로드로 채운다(선택 매핑). **이미 적재된 기존 행은 여전히 NULL**이라 그 행의 서식 칸은 공란 출력. 과거 행 백필 방식은 미정 |
 | 4 | **성명(영문) 없음** | 공란 출력. 필요하면 `humans`에 `name_en` 추가 |
 | 5 | **발급 이력 연결** — 명세 처리로직 1번 | `구분 = 발급 이력`은 담당자가 다르다(`/api/issuance-histories`). certificate 도메인은 `certificates_issued`까지만 쓰고, 이력 적재 인터페이스는 그쪽과 합의 후 붙인다 |
 | 6 | 근무기간 구간 중복 (§3-2) | 원본 데이터 확인 필요. 확인 전까지 단순 합산 |
@@ -623,7 +635,7 @@ public enum CertificateErrorCode implements ErrorProperty {
 | 8 | **총 근무기간 산정 기준 미확인** (§3-2) | 1개월 = 30일로 구현. 유성구청 기준이 다르면 `WorkPeriodCalculator.DAYS_PER_MONTH` 한 줄 |
 | 9 | ~~한글 폰트 파일 없음~~ ✅ **해소** (#34) | 나눔고딕(OFL) 임베드 (§4-1) |
 
-1~4, 8은 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
+2, 4, 8은 코드로 해결 불가능하고 외부 확인/파일 확보가 필요하다. 나머지 API는 전부 구현했다 (§8).
 
 ### 7-2. 테스트 범위
 
