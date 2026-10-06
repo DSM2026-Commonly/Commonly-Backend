@@ -1,5 +1,7 @@
 package commonly.commonlybe.human.service;
 
+import commonly.commonlybe.certificate.repository.CertificateIssuedRepository;
+import commonly.commonlybe.certificate.repository.CertificateRepository;
 import commonly.commonlybe.human.exception.HumanErrorCode;
 import commonly.commonlybe.human.controller.dto.HumanCreateRequest;
 import commonly.commonlybe.human.controller.dto.HumanCreateResponse;
@@ -24,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class HumanService {
 
     private final HumanRepository humanRepository;
+    private final CertificateIssuedRepository certificateIssuedRepository;
+    private final CertificateRepository certificateRepository;
 
     @Transactional
     public HumanCreateResponse create(HumanCreateRequest request) {
@@ -69,11 +73,33 @@ public class HumanService {
         }
     }
 
+    /**
+     * 연결된 데이터가 있으면 지우지 않고 409로 막는다.
+     *
+     * certificate.human_id와 certificates_issued.human_id는 @ManyToOne이 아닌 raw Long 컬럼이라
+     * JPA도 DB도 참조 무결성을 봐주지 않는다. humans 행만 사라지면
+     * CertificateIssuedRepository.searchHistories가 HumanEntity와 inner join이라서
+     * 그 사람의 발급 건이 발급 이력 목록에서 통째로 빠진다 — 공문서 발급 기록이 조용히 없어지는 것이다.
+     * 그래서 cascade 삭제는 선택지가 아니고, 존재 여부를 직접 조회해 삭제를 거부한다.
+     *
+     * ponytail: 담당자가 이력 있는 대상자를 목록에서 치울 방법이 아직 없다. 장기적으로는
+     * soft delete(폐기 플래그)가 맞지만, 우선 데이터가 사라지는 경로부터 막는다.
+     */
     @Transactional
     public void delete(Long humanId) {
         if (!humanRepository.existsById(humanId)) {
             throw new HumanException(HumanErrorCode.HUMAN_NOT_FOUND);
         }
+
+        // 발급 건을 먼저 본다. 재직 이력은 지우고 다시 넣을 수 있지만 발급 기록은 되돌릴 수 없어
+        // 제약이 더 무겁고, 담당자에게 줄 안내도 더 분명하다.
+        if (certificateIssuedRepository.existsByHumanId(humanId)) {
+            throw new HumanException(HumanErrorCode.HUMAN_HAS_ISSUED_CERTIFICATE);
+        }
+        if (certificateRepository.existsByHumanId(humanId)) {
+            throw new HumanException(HumanErrorCode.HUMAN_HAS_CERTIFICATE);
+        }
+
         humanRepository.deleteById(humanId);
     }
 
