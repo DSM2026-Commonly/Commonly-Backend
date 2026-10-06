@@ -38,6 +38,16 @@ class ErrorResponseCodeTest {
     }
 
     @Test
+    void enum에_없는_상태코드는_예외를_던지지_않고_HTTP_접두사를_붙인다() {
+        // ResponseStatusException은 raw 상태코드로도 만들 수 있다.
+        // valueOf()를 쓰면 에러 응답을 만드는 도중에 터진다.
+        ErrorResponse response = ErrorResponse.of(new IllegalStateException("무언가"), 599);
+
+        assertThat(response.code()).isEqualTo("HTTP_599");
+        assertThat(response.status()).isEqualTo(599);
+    }
+
+    @Test
     void 검증_에러는_VALIDATION_FAILED를_code로_쓴다() {
         BindException exception = new BindException(
                 new BeanPropertyBindingResult(new Object(), "target"));
