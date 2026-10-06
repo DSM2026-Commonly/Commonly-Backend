@@ -293,23 +293,53 @@ Response `201`
 
 **`certificateIds`가 전부 `humanId`의 것인지 반드시 검증한다.** 안 하면 남의 재직 이력이 내 증명서에 찍힌다. `findAllByCertificateIdInAndHumanId()`로 조회해 개수가 다르면 404.
 
+#### 5.1-1 POST `/api/certificates/preview` — 발급 미리보기 (민원 담당자)
+
+발급 전에 PDF를 확인하는 용도. Request는 §5.1과 **같은 body**, 검증도 같다(인적사항 존재, `certificateIds` 소유권).
+
+Response `200` — `Content-Type: application/pdf`, `Content-Disposition: inline`, body는 PDF 바이트
+
+**아무것도 남기지 않는다.** 문서번호 채번(§3-1), S3 업로드(§4-2), `certificates_issued` 저장을 전부 건너뛰고 `readOnly` 트랜잭션으로 렌더만 한다. 미리보기마다 번호를 따면 발급대장에 빈 번호가 생기기 때문이다. 그래서 PDF는 발급본과 두 군데가 다르다.
+
+| 칸 | 발급본 | 미리보기 |
+|---|---|---|
+| 문서번호 | `제 유성구-2026-000001 호` | `제 미리보기 호` |
+| 발급일 | 발급 시각 | 요청한 날 |
+
+| 상태 | 조건 |
+|---|---|
+| 400 | §5.1과 같음 |
+| 401 | 토큰 없음/무효 |
+| 403 | 담당자 아님 (현재 401, #21) |
+| 404 | §5.1과 같음 (`HUMAN_NOT_FOUND` / `CERTIFICATE_NOT_FOUND`) |
+| 500 | PDF 렌더 실패 → `CERTIFICATE_RENDER_FAILED` |
+
+POST라 프론트는 `<iframe src>`에 URL을 바로 못 넣는다. 응답을 blob으로 받아 `URL.createObjectURL()`로 띄운다. 확인 후 **같은 body로 §5.1을 호출해야** 실제로 발급된다. 리터럴 경로라 `/{certificateId}` 패턴과 겹치지 않는다.
+
 ### 5.2 POST `/api/certificates/self` — 발급 (민원인 본인)
 
-§5.1의 얇은 래퍼다. `humanId`와 `certificateIds`를 요청이 아니라 인증 주체에서 끌어온다.
+§5.1의 얇은 래퍼다. `humanId`를 요청이 아니라 인증 주체에서 끌어온다. 재직 이력은 §5.2-1 목록에서 고른 것, 안 골랐으면 전체.
 
 Request
 ```json
-{ "purpose": "은행 제출용", "otherMatters": "" }
+{ "purpose": "은행 제출용", "otherMatters": "", "certificateIds": [1, 3] }
 ```
+
+`certificateIds`는 선택이다 (최대 10개).
+
+| `certificateIds` | 동작 |
+|---|---|
+| 있음 | 그대로 §5.1에 넘긴다. 남의 id가 섞이면 §5.1의 `humanId` 조건에 걸려 404 `CERTIFICATE_NOT_FOUND` |
+| 없음/`[]` | 본인 재직 이력 **전체**. 10건을 넘으면 400 `CERTIFICATE_LIMIT_EXCEEDED` → 골라서 다시 보내라는 뜻 |
 
 Response `201` — §5.1과 동일
 
 | 상태 | 조건 |
 |---|---|
-| 400 | `purpose` 누락 / 재직 이력 10건 초과 → `CERTIFICATE_LIMIT_EXCEEDED` |
+| 400 | `purpose` 누락 / `certificateIds` 11개 이상 / 안 골랐는데 재직 이력 10건 초과 → `CERTIFICATE_LIMIT_EXCEEDED` |
 | 401 | 토큰 없음/무효 |
-| 403 | `PETITIONER` 권한 아님 (`SecurityConfig`) — **현재는 401로 나간다** (#21), §5-7 참고 |
-| 404 | 계정과 일치하는 인적사항 없음 → `PETITIONER_HUMAN_NOT_MATCHED` / 재직 이력 없음 → `CERTIFICATE_NOT_FOUND` |
+| 403 | `PETITIONER` 권한 아님 (`SecurityConfig`) — **현재는 401로 나간다** (#21), §5-7 참고 / 스위치 꺼짐 → `SELF_ISSUE_DISABLED` |
+| 404 | 계정과 일치하는 인적사항 없음 → `PETITIONER_HUMAN_NOT_MATCHED` / 재직 이력 없음·남의 id 포함 → `CERTIFICATE_NOT_FOUND` |
 
 #### 계정 ↔ 인적사항 매칭
 
@@ -317,7 +347,19 @@ Response `201` — §5.1과 동일
 
 > 문서 초안에는 "`humanId = 인증주체.humanId`"로 적혀 있었지만, 실제로는 `humanId`를 바로 얻을 수 없고 조회가 한 단계 필요하다.
 
-본인 발급은 이력을 고를 수 없어 **전체**를 넣는다. 서식이 10행이라 10건을 넘으면 400으로 막고 담당자에게 넘긴다.
+#### 5.2-1 GET `/api/certificates/self` — 본인 재직 이력 목록
+
+선택 발급 화면용. §5.4와 같은 `CertificateItemDto` 배열, 같은 정렬(`hire_date ASC, certificate_id ASC`). 대상은 위 매칭으로 찾은 본인뿐이다.
+
+Response `200` — 없으면 `[]` (§5.4와 같은 모양)
+
+| 상태 | 조건 |
+|---|---|
+| 401 | 토큰 없음/무효 |
+| 403 | `PETITIONER` 아님 (현재 401, #21) / 스위치 꺼짐 → `SELF_ISSUE_DISABLED` |
+| 404 | 계정과 일치하는 인적사항 없음 → `PETITIONER_HUMAN_NOT_MATCHED` |
+
+목록도 발급과 **같은 스위치**(`app.certificate.self-issue-enabled`) 뒤에 있다. 아래 경고대로 남의 명의로 가입하면 발급 없이도 재직 이력이 그대로 보이기 때문이다. 리터럴 경로라 `GET /{certificateId}`보다 먼저 매칭된다.
 
 > ### ⚠️ 이 매칭은 본인임을 증명하지 못한다
 >
@@ -326,6 +368,19 @@ Response `201` — §5.1과 동일
 > `Petitioner.phoneNumber`와 대조하려 해도 `humans`에 전화번호 컬럼이 없다.
 >
 > **본인인증(휴대폰/PASS 등)이 붙기 전까지 `/self`를 운영 환경에 열면 안 된다.** 권한 제한과 소유권 검사(§5-7)는 "로그인한 그 계정의 것만"을 보장할 뿐, "그 계정이 본인"인지는 보장하지 못한다.
+
+#### 5.2-2 POST `/api/certificates/self/preview` — 본인 발급 미리보기
+
+Request는 §5.2와 **같은 body**. 발급 대상도 §5.2와 같은 규칙으로 정한다(고른 이력, 안 골랐으면 전체, 10건 초과면 400). 그 뒤는 §5.1-1과 같다 — PDF를 inline으로 주고 문서번호·S3·발급 건은 만들지 않는다.
+
+Response `200` — §5.1-1과 동일
+
+| 상태 | 조건 |
+|---|---|
+| 400~404 | §5.2와 같음 (스위치 꺼짐 → `SELF_ISSUE_DISABLED` 포함) |
+| 500 | PDF 렌더 실패 → `CERTIFICATE_RENDER_FAILED` |
+
+§5.2와 **같은 스위치** 뒤에 있다. 위 경고대로 미리보기만으로도 남의 재직 이력이 보이기 때문이다.
 
 ### 5.3 GET `/api/certificates/{certificateId}` — 상세 조회
 
@@ -359,7 +414,8 @@ Response `201` — §5.1과 동일
 Response `200` — 없으면 `[]`
 ```json
 [
-  { "certificateId": 1, "division": "채용", "employmentType": "기간제",
+  { "certificateId": 1, "division": "채용", "department": "총무과",
+    "employmentType": "기간제", "jobTitle": "주무관",
     "keyResponsibilities": "string", "hireDate": "2020-01-01",
     "retirementDate": "2022-03-14", "expirationDate": "2022-03-14",
     "reason": "string", "note": "string" }
@@ -377,13 +433,28 @@ Response `200` — 없으면 `[]`
 
 정렬은 `hire_date ASC, certificate_id ASC`. 서식의 재직사항 표가 시간순이므로 여기서도 같은 순서로 준다. `hire_date`가 NULL인 행은 뒤로 (`NULLS LAST`).
 
+`department`·`jobTitle`도 내려간다 (§5.3 상세와 같은 `CertificateItemDto`). 외부 명세에는 없지만 실서버·프론트 기준이 맞다 — 명세 쪽을 갱신한다.
+
+### GET `/api/issuance-histories` — 발급 이력 목록
+
+Query: `page`(기본 1, 1부터), `size`(기본 10, `@Max(100)`), `startDate`/`endDate`(ISO 날짜, 선택), `keyword`(선택)
+
+Response `200` — **최상위 배열**. `totalPage`/`totalPages` 같은 페이지 메타는 없다 (명세가 낡음, 프론트는 배열로 받는다).
+```json
+[
+  { "issuanceHistoryId": 1, "documentNo": "string", "humanId": 1,
+    "targetName": "홍길동", "purpose": "string",
+    "totalMonths": 26, "totalDays": 13, "issuedAt": "2026-10-05T10:00:00" }
+]
+```
+
 ### 5-7. 접근 제어
 
 `SecurityConfig`에 경로별 권한을 건다. 이전에는 `anyRequest().authenticated()`뿐이라 **로그인한 민원인이 남의 경력증명서 상세를 그대로 조회할 수 있었다.**
 
 | 경로 | 권한 |
 |---|---|
-| `POST /api/certificates/self` | `PETITIONER` |
+| `GET`/`POST /api/certificates/self`, `POST /api/certificates/self/preview` | `PETITIONER` (스위치 꺼지면 `denyAll`) |
 | `GET /api/certificates/*/download` | 인증 + 소유권 검사 (아래) |
 | 그 외 `/api/certificates/**`, `/api/humans/*/certificates` | `ADMIN`, `USER` (민원 담당자) |
 
@@ -600,4 +671,4 @@ public enum CertificateErrorCode implements ErrorProperty {
 
 발급 → 조회 → 수정까지 전부 동작한다. **PDF만 없다.** `certificates_issued.file_path`가 계속 null이라 §5.5는 `404 CERTIFICATE_FILE_NOT_FOUND`를 낸다. 직인과 폰트가 확보되면 `document/CertificatePdfRenderer`를 추가하고 발급 트랜잭션 끝에서 S3에 올린 뒤 `file_path`를 채우면 된다 — 다른 코드는 안 건드려도 된다.
 
-auth 완료 후: `POST /api/certificates/self` (§5.2), 401/403 전반, 서식 담당자/연락처 칸.
+auth 완료 후: `GET`/`POST /api/certificates/self` (§5.2), 401/403 전반, 서식 담당자/연락처 칸.

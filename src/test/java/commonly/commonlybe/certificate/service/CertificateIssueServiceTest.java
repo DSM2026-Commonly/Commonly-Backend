@@ -196,6 +196,30 @@ class CertificateIssueServiceTest {
         verify(s3Uploader, never()).delete(anyString());
     }
 
+    @Test
+    void 미리보기는_문서번호를_따지_않고_저장도_하지_않는다() {
+        givenIssuable();
+        given(certificatePdfRenderer.render(any())).willReturn(PDF);
+
+        assertThat(certificateIssueService.preview(request(List.of(1L)))).isEqualTo(PDF);
+
+        verify(documentNumberGenerator, never()).generate(anyInt());
+        verify(s3Uploader, never()).upload(any(byte[].class), anyString(), anyString());
+        verify(certificateIssuedRepository, never()).save(any());
+    }
+
+    @Test
+    void 미리보기도_남의_재직_이력을_섞으면_거부한다() {
+        given(humanRepository.findById(HUMAN_ID)).willReturn(Optional.of(human()));
+        given(certificateRepository.findAllByCertificateIdInAndHumanIdOrderByHireDateAscCertificateIdAsc(
+                List.of(1L, 2L), HUMAN_ID)).willReturn(List.of(certificate(1L)));
+
+        assertThatThrownBy(() -> certificateIssueService.preview(request(List.of(1L, 2L))))
+                .isInstanceOf(CertificateException.class);
+
+        verify(certificatePdfRenderer, never()).render(any());
+    }
+
     private void givenIssuable() {
         given(humanRepository.findById(HUMAN_ID)).willReturn(Optional.of(human()));
         given(certificateRepository.findAllByCertificateIdInAndHumanIdOrderByHireDateAscCertificateIdAsc(

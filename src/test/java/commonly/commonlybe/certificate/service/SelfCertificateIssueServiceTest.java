@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueRequest;
+import commonly.commonlybe.certificate.controller.dto.CertificateItemDto;
 import commonly.commonlybe.certificate.controller.dto.SelfCertificateIssueRequest;
 import commonly.commonlybe.certificate.entity.CertificateEntity;
 import commonly.commonlybe.certificate.exception.CertificateErrorCode;
@@ -56,7 +57,7 @@ class SelfCertificateIssueServiceTest {
         ReflectionTestUtils.setField(selfCertificateIssueService, "selfIssueEnabled", false);
 
         assertThatThrownBy(() -> selfCertificateIssueService.issue(
-                authDetails, new SelfCertificateIssueRequest("은행 제출용", null)))
+                authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null)))
                 .isInstanceOf(CertificateException.class)
                 .extracting(e -> ((CertificateException) e).getErrorProperty())
                 .isEqualTo(CertificateErrorCode.SELF_ISSUE_DISABLED);
@@ -68,7 +69,7 @@ class SelfCertificateIssueServiceTest {
     void 본인의_재직_이력_전체로_발급한다() {
         givenCertificates(2);
 
-        selfCertificateIssueService.issue(authDetails, new SelfCertificateIssueRequest("은행 제출용", null));
+        selfCertificateIssueService.issue(authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null));
 
         ArgumentCaptor<CertificateIssueRequest> captor =
                 ArgumentCaptor.forClass(CertificateIssueRequest.class);
@@ -82,7 +83,7 @@ class SelfCertificateIssueServiceTest {
         givenCertificates(0);
 
         assertThatThrownBy(() -> selfCertificateIssueService.issue(
-                authDetails, new SelfCertificateIssueRequest("은행 제출용", null)))
+                authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null)))
                 .isInstanceOf(CertificateException.class)
                 .extracting(e -> ((CertificateException) e).getErrorProperty())
                 .isEqualTo(CertificateErrorCode.CERTIFICATE_NOT_FOUND);
@@ -95,7 +96,7 @@ class SelfCertificateIssueServiceTest {
         givenCertificates(11);
 
         assertThatThrownBy(() -> selfCertificateIssueService.issue(
-                authDetails, new SelfCertificateIssueRequest("은행 제출용", null)))
+                authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null)))
                 .isInstanceOf(CertificateException.class)
                 .extracting(e -> ((CertificateException) e).getErrorProperty())
                 .isEqualTo(CertificateErrorCode.CERTIFICATE_LIMIT_EXCEEDED);
@@ -103,13 +104,74 @@ class SelfCertificateIssueServiceTest {
         verify(certificateIssueService, never()).issue(any());
     }
 
-    private void givenCertificates(int count) {
+    @Test
+    void 고른_재직_이력만으로_발급한다() {
+        givenHuman();
+
+        selfCertificateIssueService.issue(authDetails,
+                new SelfCertificateIssueRequest("은행 제출용", null, List.of(2L)));
+
+        verify(certificateIssueService).issue(
+                new CertificateIssueRequest(HUMAN_ID, List.of(2L), "은행 제출용", null));
+        verifyNoInteractions(certificateRepository);
+    }
+
+    @Test
+    void 미리보기는_발급과_같은_대상으로_PDF만_만든다() {
+        givenCertificates(2);
+
+        selfCertificateIssueService.preview(authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null));
+
+        verify(certificateIssueService).preview(
+                new CertificateIssueRequest(HUMAN_ID, List.of(1L, 2L), "은행 제출용", null));
+        verify(certificateIssueService, never()).issue(any());
+    }
+
+    @Test
+    void 스위치가_꺼져_있으면_미리보기도_거부한다() {
+        ReflectionTestUtils.setField(selfCertificateIssueService, "selfIssueEnabled", false);
+
+        assertThatThrownBy(() -> selfCertificateIssueService.preview(
+                authDetails, new SelfCertificateIssueRequest("은행 제출용", null, null)))
+                .isInstanceOf(CertificateException.class)
+                .extracting(e -> ((CertificateException) e).getErrorProperty())
+                .isEqualTo(CertificateErrorCode.SELF_ISSUE_DISABLED);
+
+        verifyNoInteractions(petitionerHumanResolver, certificateRepository, certificateIssueService);
+    }
+
+    @Test
+    void 본인_재직_이력_목록을_준다() {
+        givenCertificates(2);
+
+        org.assertj.core.api.Assertions.assertThat(selfCertificateIssueService.findMine(authDetails))
+                .extracting(CertificateItemDto::certificateId)
+                .containsExactly(1L, 2L);
+    }
+
+    @Test
+    void 스위치가_꺼져_있으면_목록도_거부한다() {
+        ReflectionTestUtils.setField(selfCertificateIssueService, "selfIssueEnabled", false);
+
+        assertThatThrownBy(() -> selfCertificateIssueService.findMine(authDetails))
+                .isInstanceOf(CertificateException.class)
+                .extracting(e -> ((CertificateException) e).getErrorProperty())
+                .isEqualTo(CertificateErrorCode.SELF_ISSUE_DISABLED);
+
+        verifyNoInteractions(petitionerHumanResolver);
+    }
+
+    private void givenHuman() {
         HumanEntity human = HumanEntity.builder()
                 .name("홍길동")
                 .birthDate(LocalDate.of(1990, 1, 1))
                 .build();
         ReflectionTestUtils.setField(human, "humanId", HUMAN_ID);
         given(petitionerHumanResolver.resolve(authDetails)).willReturn(human);
+    }
+
+    private void givenCertificates(int count) {
+        givenHuman();
 
         List<CertificateEntity> certificates = IntStream.rangeClosed(1, count)
                 .mapToObj(i -> {

@@ -81,9 +81,9 @@ class IssuanceHistoryApiTest {
         mockMvc.perform(get("/api/issuance-histories")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].documentNo").value("유성구-2026-000002"))
-            .andExpect(jsonPath("$[0].targetName").value("김철수"))
-            .andExpect(jsonPath("$[1].documentNo").value("유성구-2026-000001"));
+            .andExpect(jsonPath("$.content[0].documentNo").value("유성구-2026-000002"))
+            .andExpect(jsonPath("$.content[0].targetName").value("김철수"))
+            .andExpect(jsonPath("$.content[1].documentNo").value("유성구-2026-000001"));
     }
 
     @Test
@@ -92,8 +92,8 @@ class IssuanceHistoryApiTest {
                 .header("Authorization", "Bearer " + adminToken)
                 .param("keyword", "홍길"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].targetName").value("홍길동"));
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].targetName").value("홍길동"));
     }
 
     @Test
@@ -103,8 +103,8 @@ class IssuanceHistoryApiTest {
                 .param("startDate", "2026-08-21")
                 .param("endDate", "2026-08-26"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].documentNo").value("유성구-2026-000002"));
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].documentNo").value("유성구-2026-000002"));
     }
 
     @Test
@@ -151,6 +151,6 @@ class IssuanceHistoryApiTest {
                 .header("Authorization", "Bearer " + adminToken)
                 .param("startDate", "2026-08-01"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2));
+            .andExpect(jsonPath("$.content.length()").value(2));
     }
 }

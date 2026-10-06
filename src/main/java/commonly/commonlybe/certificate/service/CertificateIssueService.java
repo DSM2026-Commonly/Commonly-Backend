@@ -32,6 +32,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class CertificateIssueService {
 
+    /** 미리보기 PDF의 문서번호 자리. 발급본과 헷갈리지 않게 번호 대신 찍는다. */
+    private static final String PREVIEW_DOCUMENT_NO = "미리보기";
+
     private final HumanRepository humanRepository;
     private final CertificateRepository certificateRepository;
     private final CertificateIssuedRepository certificateIssuedRepository;
@@ -47,16 +50,8 @@ public class CertificateIssueService {
      */
     @Transactional
     public CertificateIssueResponse issue(CertificateIssueRequest request) {
-        HumanEntity human = humanRepository.findById(request.humanId())
-                .orElseThrow(() -> new HumanException(HumanErrorCode.HUMAN_NOT_FOUND));
-
-        // humanId 조건이 핵심이다. 빼면 남의 재직 이력이 증명서에 찍힌다.
-        List<CertificateEntity> certificates =
-                certificateRepository.findAllByCertificateIdInAndHumanIdOrderByHireDateAscCertificateIdAsc(
-                        request.certificateIds(), request.humanId());
-        if (certificates.size() != new HashSet<>(request.certificateIds()).size()) {
-            throw new CertificateException(CertificateErrorCode.CERTIFICATE_NOT_FOUND);
-        }
+        HumanEntity human = findHuman(request);
+        List<CertificateEntity> certificates = findCertificates(request);
 
         WorkPeriod total = WorkPeriodCalculator.totalOf(certificates);
         LocalDateTime issuedAt = LocalDateTime.now();
@@ -85,6 +80,35 @@ public class CertificateIssueService {
                 issued.getCertificateIssuedId(),
                 issued.getDocumentNo(),
                 "/api/certificates/%d/download".formatted(issued.getCertificateIssuedId()));
+    }
+
+    /**
+     * 발급과 같은 PDF를 만들되 문서번호를 따지 않고, S3에도 DB에도 남기지 않는다.
+     * 미리보기마다 번호를 소모하면 발급대장에 빈 번호가 생긴다.
+     */
+    @Transactional(readOnly = true)
+    public byte[] preview(CertificateIssueRequest request) {
+        HumanEntity human = findHuman(request);
+        List<CertificateEntity> certificates = findCertificates(request);
+        return certificatePdfRenderer.render(new CertificateDocument(
+                PREVIEW_DOCUMENT_NO, human, certificates, WorkPeriodCalculator.totalOf(certificates),
+                request.purpose(), request.otherMatters(), LocalDate.now()));
+    }
+
+    private HumanEntity findHuman(CertificateIssueRequest request) {
+        return humanRepository.findById(request.humanId())
+                .orElseThrow(() -> new HumanException(HumanErrorCode.HUMAN_NOT_FOUND));
+    }
+
+    /** humanId 조건이 핵심이다. 빼면 남의 재직 이력이 증명서에 찍힌다. */
+    private List<CertificateEntity> findCertificates(CertificateIssueRequest request) {
+        List<CertificateEntity> certificates =
+                certificateRepository.findAllByCertificateIdInAndHumanIdOrderByHireDateAscCertificateIdAsc(
+                        request.certificateIds(), request.humanId());
+        if (certificates.size() != new HashSet<>(request.certificateIds()).size()) {
+            throw new CertificateException(CertificateErrorCode.CERTIFICATE_NOT_FOUND);
+        }
+        return certificates;
     }
 
     /** 문서번호가 유일하니 key도 유일하다. 날짜 경로 대신 연도만 둬서 문서번호로 바로 찾을 수 있게 한다. */
