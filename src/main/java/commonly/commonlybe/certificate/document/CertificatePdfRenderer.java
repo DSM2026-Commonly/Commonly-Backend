@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -41,16 +42,20 @@ public class CertificatePdfRenderer {
             @page { size: A4; margin: 18mm 16mm; }
             body { font-family: '%s'; font-size: 10.5pt; color: #000; }
             table { width: 100%%; border-collapse: collapse; }
+            h1 { text-align: center; font-size: 22pt; letter-spacing: 12pt; text-decoration: underline; margin: 6px 0 22px; }
             .header td { padding: 2px 0; font-size: 10pt; }
-            h1 { text-align: center; font-size: 22pt; letter-spacing: 12pt; margin: 18px 0 16px; }
+            .header .staff { width: 30%%; }
             .main td { border: 1px solid #000; padding: 6px 4px; text-align: center; word-wrap: break-word; }
-            .main .label { font-weight: bold; background: #f2f2f2; white-space: nowrap; }
+            .main .label { white-space: nowrap; }
             .main .date { white-space: nowrap; }
             .main .left { text-align: left; }
-            .main .work td { height: 18px; }
-            .footer { margin-top: 28px; text-align: center; }
+            .main .total { font-weight: bold; }
+            .main .work td { height: 24px; }
+            .footer { margin-top: 14px; }
             .footer p { margin: 10px 0; }
-            .issuer { font-size: 16pt; font-weight: bold; margin-top: 22px; }
+            .footer .statement { font-size: 12pt; }
+            .footer .issued { text-align: center; margin-top: 24px; font-size: 12pt; }
+            .footer .issuer { text-align: right; font-size: 13pt; margin: 22px 30px 0 0; }
             """.formatted(FONT_FAMILY);
 
     public byte[] render(CertificateDocument document) {
@@ -75,37 +80,38 @@ public class CertificatePdfRenderer {
                 .append(STYLE)
                 .append("</style></head><body>");
 
-        // 담당자/연락처는 발급 주체를 저장하지 않아 공란이다 (§7-1 1번).
-        html.append("<table class=\"header\"><tr>")
-                .append("<td>제 ").append(escape(document.documentNo())).append(" 호</td>")
-                .append("<td style=\"text-align:right\">담 당 자 :</td></tr><tr><td></td>")
-                .append("<td style=\"text-align:right\">연 락 처 :</td></tr></table>");
-
         html.append("<h1>경력증명서</h1>");
 
+        // 담당자/연락처는 발급 주체를 저장하지 않아 공란이다 (§7-1 1번).
+        html.append("<table class=\"header\"><tr><td></td>")
+                .append("<td class=\"staff\">담 당 자 :</td></tr><tr>")
+                .append("<td>제 ").append(escape(document.documentNo())).append(" 호</td>")
+                .append("<td class=\"staff\">연 락 처 :</td></tr></table>");
+
+        // 서식 열 5개: 구분 | 부터(성명) | 까지(한글/영문) | 근무부서(생년월일) | 담당업무(생년월일 값)
         html.append("<table class=\"main\">")
-                .append("<colgroup><col style=\"width:14%\"/><col style=\"width:14%\"/><col style=\"width:14%\"/>")
-                .append("<col style=\"width:16%\"/><col style=\"width:24%\"/><col style=\"width:18%\"/></colgroup>");
+                .append("<colgroup><col style=\"width:13%\"/><col style=\"width:15%\"/><col style=\"width:16%\"/>")
+                .append("<col style=\"width:15%\"/><col style=\"width:41%\"/></colgroup>");
 
         // 인적사항. 성명(영문)은 어디에도 없어 공란 (§7-1 4번).
-        html.append("<tr><td class=\"label\" rowspan=\"3\">인적사항</td><td class=\"label\">성 명</td>")
-                .append("<td class=\"left\" colspan=\"2\">(한글) ").append(escape(human.getName())).append("</td>")
-                .append("<td class=\"left\" colspan=\"2\">(영문) </td></tr>");
-        html.append("<tr><td class=\"label\">생년월일</td><td class=\"left\" colspan=\"4\">")
-                .append(date(human.getBirthDate())).append("</td></tr>");
-        html.append("<tr><td class=\"label\">주 소</td><td class=\"left\" colspan=\"4\">")
+        html.append("<tr><td class=\"label\" rowspan=\"3\">인적사항</td><td class=\"label\" rowspan=\"2\">성 명</td>")
+                .append("<td class=\"left\">(한글) ").append(escape(human.getName())).append("</td>")
+                .append("<td class=\"label\" rowspan=\"2\">생년월일</td>")
+                .append("<td rowspan=\"2\">").append(date(human.getBirthDate())).append("</td></tr>");
+        html.append("<tr><td class=\"left\">(영문) </td></tr>");
+        html.append("<tr><td class=\"label\">주 소</td><td class=\"left\" colspan=\"3\">")
                 .append(escape(human.getAddress())).append("</td></tr>");
 
         // 재직사항: 헤더 2행 + 데이터 10행.
-        html.append("<tr><td class=\"label\" rowspan=\"").append(WORK_ROWS + 2).append("\">재직사항</td>")
+        List<CertificateEntity> certificates = document.certificates();
+        int rows = Math.max(WORK_ROWS, certificates.size());
+        html.append("<tr><td class=\"label\" rowspan=\"").append(rows + 2).append("\">재직사항</td>")
                 .append("<td class=\"label\" colspan=\"2\">근무기간</td>")
                 .append("<td class=\"label\" rowspan=\"2\">근무부서</td>")
-                .append("<td class=\"label\" rowspan=\"2\">담당업무</td>")
-                .append("<td class=\"label\" rowspan=\"2\">퇴직사유</td></tr>")
+                .append("<td class=\"label\" rowspan=\"2\">담당업무</td></tr>")
                 .append("<tr><td class=\"label\">부터</td><td class=\"label\">까지</td></tr>");
 
-        List<CertificateEntity> certificates = document.certificates();
-        for (int i = 0; i < Math.max(WORK_ROWS, certificates.size()); i++) {
+        for (int i = 0; i < rows; i++) {
             html.append("<tr class=\"work\">");
             if (i < certificates.size()) {
                 CertificateEntity certificate = certificates.get(i);
@@ -113,25 +119,31 @@ public class CertificatePdfRenderer {
                 html.append("<td class=\"date\">").append(date(certificate.getHireDate())).append("</td>")
                         .append("<td class=\"date\">").append(date(certificate.workEndDate())).append("</td>")
                         .append("<td>").append(escape(certificate.getDepartment())).append("</td>")
-                        .append("<td>").append(escape(certificate.getKeyResponsibilities())).append("</td>")
-                        .append("<td>").append(escape(certificate.getReason())).append("</td>");
+                        .append("<td>").append(escape(certificate.getKeyResponsibilities())).append("</td>");
             } else {
-                html.append("<td></td><td></td><td></td><td></td><td></td>");
+                html.append("<td></td><td></td><td></td><td></td>");
             }
             html.append("</tr>");
         }
 
-        html.append("<tr><td class=\"label\">총 근무기간</td><td class=\"left\" colspan=\"5\">총 ")
+        // 서식에 퇴직사유 칸이 하나뿐이라 행별 사유를 중복 없이 이어 찍는다.
+        String reasons = certificates.stream()
+                .map(CertificateEntity::getReason)
+                .filter(reason -> reason != null && !reason.isBlank())
+                .distinct()
+                .collect(Collectors.joining(", "));
+        html.append("<tr><td class=\"label\">총 근무<br/>기간</td><td class=\"total\" colspan=\"2\">총 ")
                 .append(document.total().months()).append(" 개월 ")
-                .append(document.total().days()).append(" 일</td></tr>");
-        html.append("<tr><td class=\"label\">그 밖의 사항</td><td class=\"left\" colspan=\"5\">")
+                .append(document.total().days()).append(" 일</td>")
+                .append("<td class=\"label\">퇴직사유</td><td>").append(escape(reasons)).append("</td></tr>");
+        html.append("<tr><td class=\"label\">그 밖의<br/>사항</td><td class=\"left\" colspan=\"4\">")
                 .append(multiline(document.otherMatters())).append("</td></tr>");
-        html.append("<tr><td class=\"label\">용 도</td><td class=\"left\" colspan=\"5\">")
+        html.append("<tr><td class=\"label\">용 도</td><td class=\"left\" colspan=\"4\">")
                 .append(escape(document.purpose())).append("</td></tr>");
         html.append("</table>");
 
-        html.append("<div class=\"footer\"><p>위와 같이 경력을 증명합니다.</p>")
-                .append("<p>").append(ISSUE_DATE.format(document.issuedDate())).append("</p>")
+        html.append("<div class=\"footer\"><p class=\"statement\">위와 같이 재직ㆍ경력을 증명합니다.</p>")
+                .append("<p class=\"issued\">").append(ISSUE_DATE.format(document.issuedDate())).append("</p>")
                 .append("<p class=\"issuer\">대전광역시 유성구청장 (인)</p></div>");
 
         html.append("</body></html>");
