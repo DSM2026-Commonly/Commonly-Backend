@@ -20,7 +20,7 @@ spring:
 
   sql:
     init:
-      mode: always   # schema.sql: document_number_seq, refresh_token
+      mode: always   # schema.sql: document_number_seq, refresh_token, certificates_issued.issue_reason
 
   servlet:
     multipart:

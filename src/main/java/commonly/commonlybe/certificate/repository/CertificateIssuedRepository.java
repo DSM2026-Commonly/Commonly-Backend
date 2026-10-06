@@ -20,7 +20,7 @@ public interface CertificateIssuedRepository extends JpaRepository<CertificateIs
     @Query("""
             select new commonly.commonlybe.certificate.controller.dto.IssuanceHistoryResponse(
                 i.certificateIssuedId, i.documentNo, i.humanId, h.name, i.purpose,
-                i.totalMonths, i.totalDays, i.issuedAt)
+                i.issueReason, i.totalMonths, i.totalDays, i.issuedAt)
             from CertificateIssuedEntity i
             join HumanEntity h on h.humanId = i.humanId
             where h.name like concat('%', :keyword, '%')

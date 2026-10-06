@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueRequest;
 import commonly.commonlybe.certificate.controller.dto.CertificateIssueResponse;
 import commonly.commonlybe.certificate.document.CertificatePdfRenderer;
+import commonly.commonlybe.certificate.document.CertificatePdfRenderer.CertificateDocument;
 import commonly.commonlybe.certificate.document.DocumentNumberGenerator;
 import commonly.commonlybe.certificate.entity.CertificateEntity;
 import commonly.commonlybe.certificate.entity.CertificateIssuedEntity;
@@ -220,6 +221,41 @@ class CertificateIssueServiceTest {
         verify(certificatePdfRenderer, never()).render(any());
     }
 
+    @Test
+    void 발급_사유를_발급_건에_저장한다() {
+        givenIssuable();
+        givenPdfUploaded();
+
+        certificateIssueService.issue(requestWithIssueReason("본인 요청 - 전화 접수"));
+
+        verify(certificateIssuedRepository).save(org.mockito.ArgumentMatchers.<CertificateIssuedEntity>argThat(
+                issued -> "본인 요청 - 전화 접수".equals(issued.getIssueReason())));
+    }
+
+    @Test
+    void 발급_사유가_없어도_발급된다() {
+        givenIssuable();
+        givenPdfUploaded();
+
+        CertificateIssueResponse response = certificateIssueService.issue(requestWithIssueReason(null));
+
+        assertThat(response.documentNo()).isEqualTo(DOCUMENT_NO);
+        verify(certificateIssuedRepository).save(org.mockito.ArgumentMatchers.<CertificateIssuedEntity>argThat(
+                issued -> issued.getIssueReason() == null));
+    }
+
+    /** 서식에 발급 사유 칸이 없다. PDF에 찍히는 자유 입력은 purpose(용도)와 otherMatters(그 밖의 사항)뿐이다. */
+    @Test
+    void 발급_사유는_PDF로_넘어가지_않는다() {
+        givenIssuable();
+        givenPdfUploaded();
+
+        certificateIssueService.issue(requestWithIssueReason("감사 자료 제출 요청"));
+
+        verify(certificatePdfRenderer).render(org.mockito.ArgumentMatchers.<CertificateDocument>argThat(
+                document -> "은행 제출용".equals(document.purpose()) && document.otherMatters() == null));
+    }
+
     private void givenIssuable() {
         given(humanRepository.findById(HUMAN_ID)).willReturn(Optional.of(human()));
         given(certificateRepository.findAllByCertificateIdInAndHumanIdOrderByHireDateAscCertificateIdAsc(
@@ -258,7 +294,11 @@ class CertificateIssueServiceTest {
     }
 
     private CertificateIssueRequest request(List<Long> certificateIds) {
-        return new CertificateIssueRequest(HUMAN_ID, certificateIds, "은행 제출용", null);
+        return new CertificateIssueRequest(HUMAN_ID, certificateIds, "은행 제출용", null, null);
+    }
+
+    private CertificateIssueRequest requestWithIssueReason(String issueReason) {
+        return new CertificateIssueRequest(HUMAN_ID, List.of(1L), "은행 제출용", null, issueReason);
     }
 
     private CertificateEntity certificate(Long certificateId) {

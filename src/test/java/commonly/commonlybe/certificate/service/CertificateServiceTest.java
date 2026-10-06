@@ -8,14 +8,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import commonly.commonlybe.certificate.controller.dto.CertificateCreateRequest;
+import commonly.commonlybe.certificate.controller.dto.CertificateDetailResponse;
 import commonly.commonlybe.certificate.entity.CertificateEntity;
+import commonly.commonlybe.certificate.entity.CertificateIssuedEntity;
 import commonly.commonlybe.certificate.entity.Gender;
+import commonly.commonlybe.certificate.repository.CertificateIssuedRepository;
 import commonly.commonlybe.certificate.repository.CertificateRepository;
 import commonly.commonlybe.human.entity.HumanEntity;
 import commonly.commonlybe.human.exception.HumanErrorCode;
 import commonly.commonlybe.human.exception.HumanException;
 import commonly.commonlybe.human.repository.HumanRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +41,9 @@ class CertificateServiceTest {
 
     @Mock
     private CertificateRepository certificateRepository;
+
+    @Mock
+    private CertificateIssuedRepository certificateIssuedRepository;
 
     @InjectMocks
     private CertificateService certificateService;
@@ -73,6 +81,43 @@ class CertificateServiceTest {
         assertThat(saved.getValue().getGender()).isEqualTo(Gender.MALE);
         assertThat(saved.getValue().getDepartment()).isNull();
         assertThat(saved.getValue().getDivision()).isEqualTo("채용");
+    }
+
+    /** 저장만 하고 못 읽으면 "발급 이력에서 왜 발급했는지를 못 본다"는 #46 원래 문제가 그대로 남는다. */
+    @Test
+    void 발급_상세에_발급_사유가_내려온다() {
+        given(certificateIssuedRepository.findById(9L)).willReturn(Optional.of(issued("감사 자료 제출 요청")));
+        given(humanRepository.findById(HUMAN_ID)).willReturn(Optional.of(human()));
+        given(certificateRepository.findAllByCertificateIdInOrderByHireDateAscCertificateIdAsc(List.of(1L)))
+                .willReturn(List.of());
+
+        CertificateDetailResponse response = certificateService.findIssued(9L);
+
+        assertThat(response.issueReason()).isEqualTo("감사 자료 제출 요청");
+        assertThat(response.purpose()).isEqualTo("은행 제출용");
+    }
+
+    @Test
+    void 발급_사유가_없는_건의_상세는_null로_내려온다() {
+        given(certificateIssuedRepository.findById(9L)).willReturn(Optional.of(issued(null)));
+        given(humanRepository.findById(HUMAN_ID)).willReturn(Optional.of(human()));
+        given(certificateRepository.findAllByCertificateIdInOrderByHireDateAscCertificateIdAsc(List.of(1L)))
+                .willReturn(List.of());
+
+        assertThat(certificateService.findIssued(9L).issueReason()).isNull();
+    }
+
+    private CertificateIssuedEntity issued(String issueReason) {
+        return CertificateIssuedEntity.builder()
+                .humanId(HUMAN_ID)
+                .documentNo("유성구-2026-000009")
+                .purpose("은행 제출용")
+                .issueReason(issueReason)
+                .totalMonths(12)
+                .totalDays(3)
+                .issuedAt(LocalDateTime.of(2026, 8, 20, 10, 0))
+                .certificateIds(List.of(1L))
+                .build();
     }
 
     private HumanEntity human() {

@@ -15,3 +15,9 @@ CREATE TABLE IF NOT EXISTS refresh_token (
 );
 
 CREATE INDEX IF NOT EXISTS idx_refresh_token_account_id ON refresh_token(account_id);
+
+-- #46 발급 사유. ddl-auto=validate라 JPA가 컬럼을 만들어주지 않아 여기서 붙인다.
+-- ALTER TABLE IF EXISTS인 이유: 이 스크립트는 Hibernate보다 먼저 돌기 때문에,
+-- ddl-auto=create-drop으로 테이블을 나중에 만드는 테스트(H2)에서는 아직 테이블이 없다.
+-- IF EXISTS를 빼면 테스트 컨텍스트 로딩이 스크립트 실패로 깨진다. Postgres/H2 양쪽 문법이다.
+ALTER TABLE IF EXISTS certificates_issued ADD COLUMN IF NOT EXISTS issue_reason TEXT;
