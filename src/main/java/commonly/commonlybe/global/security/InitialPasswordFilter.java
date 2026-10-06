@@ -17,6 +17,7 @@ import java.io.IOException;
  */
 public class InitialPasswordFilter extends OncePerRequestFilter {
     private static final String PASSWORD_CHANGE_PATH = "/api/admin/password";
+    private static final String ME_PATH = "/api/users/me";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -24,13 +25,25 @@ public class InitialPasswordFilter extends OncePerRequestFilter {
         if (authentication != null
             && authentication.getPrincipal() instanceof AuthDetails authDetails
             && !authDetails.user().isPasswordChanged()
-            && !isPasswordChangeRequest(request)) {
+            && !isAllowedBeforePasswordChange(request)) {
             throw new InitialPasswordNotChangedException();
         }
         filterChain.doFilter(request, response);
     }
 
+    private boolean isAllowedBeforePasswordChange(HttpServletRequest request) {
+        return isPasswordChangeRequest(request) || isMeRequest(request);
+    }
+
     private boolean isPasswordChangeRequest(HttpServletRequest request) {
         return "PATCH".equals(request.getMethod()) && PASSWORD_CHANGE_PATH.equals(request.getRequestURI());
+    }
+
+    /**
+     * 내 정보 조회는 막지 않는다. 클라이언트가 passwordChanged를 읽어야
+     * 비밀번호 변경 화면으로 보낼 수 있는데, 이것까지 막으면 알아낼 방법이 없다.
+     */
+    private boolean isMeRequest(HttpServletRequest request) {
+        return "GET".equals(request.getMethod()) && ME_PATH.equals(request.getRequestURI());
     }
 }

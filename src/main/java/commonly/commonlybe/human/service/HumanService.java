@@ -4,7 +4,9 @@ import commonly.commonlybe.human.exception.HumanErrorCode;
 import commonly.commonlybe.human.controller.dto.HumanCreateRequest;
 import commonly.commonlybe.human.controller.dto.HumanCreateResponse;
 import commonly.commonlybe.human.controller.dto.HumanSearchRequest;
-import commonly.commonlybe.human.controller.dto.HumanSearchResponse;
+import commonly.commonlybe.human.controller.dto.HumanDto;
+import commonly.commonlybe.global.page.PageNumber;
+import commonly.commonlybe.global.page.PageResponse;
 import commonly.commonlybe.human.controller.dto.HumanUpdateRequest;
 import commonly.commonlybe.human.entity.HumanEntity;
 import commonly.commonlybe.human.exception.HumanException;
@@ -12,7 +14,7 @@ import commonly.commonlybe.human.repository.HumanRepository;
 import commonly.commonlybe.human.repository.HumanSpecifications;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,10 +78,11 @@ public class HumanService {
     }
 
     @Transactional(readOnly = true)
-    public HumanSearchResponse search(HumanSearchRequest request) {
+    public PageResponse<HumanDto> search(HumanSearchRequest request) {
         // 정렬이 없으면 페이지 간 순서가 보장되지 않는다.
-        PageRequest pageRequest = PageRequest.of(request.page(), request.size(), Sort.by("humanId"));
-        return HumanSearchResponse.from(
-                humanRepository.findAll(HumanSpecifications.search(request), pageRequest));
+        Pageable pageable = PageNumber.toPageable(request.page(), request.size(), Sort.by("humanId"));
+        return PageResponse.of(
+                humanRepository.findAll(HumanSpecifications.search(request), pageable),
+                HumanDto::from);
     }
 }

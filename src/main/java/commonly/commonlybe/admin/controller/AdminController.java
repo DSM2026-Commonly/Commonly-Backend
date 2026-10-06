@@ -3,6 +3,7 @@ package commonly.commonlybe.admin.controller;
 import commonly.commonlybe.admin.controller.dto.ChangeInitialPasswordRequest;
 import commonly.commonlybe.admin.controller.dto.CreateUserRequest;
 import commonly.commonlybe.admin.controller.dto.UserListResponse;
+import commonly.commonlybe.global.page.PageResponse;
 import commonly.commonlybe.admin.service.ChangeInitialPasswordService;
 import commonly.commonlybe.admin.service.CreateUserService;
 import commonly.commonlybe.admin.service.DeleteUserService;
@@ -24,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -48,7 +48,7 @@ public class AdminController {
     }
 
     @GetMapping("/admins")
-    public List<UserListResponse> queryUserList(@RequestParam(defaultValue = "1") @Min(1) int page,
+    public PageResponse<UserListResponse> queryUserList(@RequestParam(defaultValue = "1") @Min(1) int page,
                                                 @RequestParam(defaultValue = "10") @Min(1) int size,
                                                 @RequestParam(required = false) String keyword) {
         return queryUserListService.execute(page, size, keyword);
