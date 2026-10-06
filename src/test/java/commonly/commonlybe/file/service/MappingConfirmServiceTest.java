@@ -49,6 +49,9 @@ class MappingConfirmServiceTest {
     private static final String OBJECT_KEY = "excel/upload.xlsx";
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 1, 1);
     private static final List<String> HEADERS = List.of("성명", "생년월일", "성별", "채용일");
+    /** 부서 열은 FE가 나중에 추가한 열이다. 기존 서식에는 없어서 별도 헤더로 둔다 (#63). */
+    private static final List<String> HEADERS_WITH_DEPARTMENT =
+            List.of("성명", "생년월일", "성별", "채용일", "근무부서");
 
     @Mock
     private FileRepository fileRepository;
@@ -149,7 +152,72 @@ class MappingConfirmServiceTest {
         verify(certificateRepository, never()).saveAll(any());
     }
 
+    /** 엑셀로 올린 경력은 증명서의 근무부서 칸이 비어서 발급됐다 (#63). */
+    @Test
+    void 부서_열을_매핑하면_근무부서가_저장된다() throws IOException {
+        givenUploadedExcel(HEADERS_WITH_DEPARTMENT,
+                List.of(List.of("홍길동", "1990-01-01", "남", "2020-01-01", "총무과")));
+        given(humanRepository.findByNameAndBirthDate("홍길동", BIRTH_DATE)).willReturn(Optional.of(human()));
+
+        MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequestWithDepartment());
+
+        assertThat(response.insertedCount()).isEqualTo(1);
+        assertThat(response.failedRows()).isEmpty();
+        assertThat(captureSaved()).extracting(CertificateEntity::getDepartment).containsExactly("총무과");
+    }
+
+    /**
+     * 부서 열이 없는 기존 운영 엑셀도 계속 올라가야 한다.
+     * department를 필수로 만들면 그 파일이 전부 REQUIRED_FIELD_NOT_MAPPED로 거부된다.
+     */
+    @Test
+    void 부서_열을_매핑하지_않아도_업로드가_성공하고_근무부서는_null이다() throws IOException {
+        givenUploadedExcel(List.of(List.of("홍길동", "1990-01-01", "남", "2020-01-01")));
+        given(humanRepository.findByNameAndBirthDate("홍길동", BIRTH_DATE)).willReturn(Optional.of(human()));
+
+        MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequest());
+
+        assertThat(response.insertedCount()).isEqualTo(1);
+        assertThat(response.failedRows()).isEmpty();
+        assertThat(captureSaved()).extracting(CertificateEntity::getDepartment).containsOnlyNulls();
+    }
+
+    /** 공란은 null이어야 한다. 빈 문자열이면 서식에 빈 부서명이 "값이 있는 것"으로 남는다. */
+    @Test
+    void 부서_칸이_빈_행은_근무부서를_null로_둔다() throws IOException {
+        givenUploadedExcel(HEADERS_WITH_DEPARTMENT,
+                List.of(List.of("홍길동", "1990-01-01", "남", "2020-01-01", "   ")));
+        given(humanRepository.findByNameAndBirthDate("홍길동", BIRTH_DATE)).willReturn(Optional.of(human()));
+
+        MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequestWithDepartment());
+
+        assertThat(response.insertedCount()).isEqualTo(1);
+        assertThat(captureSaved()).extracting(CertificateEntity::getDepartment).containsOnlyNulls();
+    }
+
+    /**
+     * humans.department는 사람당 한 개라 전보 이력을 표현할 수 없다.
+     * 같은 사람이라도 행마다 그 행의 부서가 그대로 남아야 한다 (certificate-domain.md §1-2).
+     */
+    @Test
+    void 같은_사람의_행마다_다른_부서가_각각_저장된다() throws IOException {
+        givenUploadedExcel(HEADERS_WITH_DEPARTMENT, List.of(
+                List.of("홍길동", "1990-01-01", "남", "2020-01-01", "총무과"),
+                List.of("홍길동", "1990-01-01", "남", "2023-01-01", "민원과")));
+        given(humanRepository.findByNameAndBirthDate("홍길동", BIRTH_DATE)).willReturn(Optional.of(human()));
+
+        MappingConfirmResponse response = mappingConfirmService.confirm(FILE_ID, confirmRequestWithDepartment());
+
+        assertThat(response.insertedCount()).isEqualTo(2);
+        assertThat(captureSaved()).extracting(CertificateEntity::getDepartment)
+                .containsExactly("총무과", "민원과");
+    }
+
     private void givenUploadedExcel(List<List<String>> rows) throws IOException {
+        givenUploadedExcel(HEADERS, rows);
+    }
+
+    private void givenUploadedExcel(List<String> headers, List<List<String>> rows) throws IOException {
         FileEntity fileEntity = FileEntity.builder()
                 .originalName("upload.xlsx")
                 .savedName("upload.xlsx")
@@ -157,15 +225,15 @@ class MappingConfirmServiceTest {
                 .fileSize(1L)
                 .build();
         given(fileRepository.findById(FILE_ID)).willReturn(Optional.of(fileEntity));
-        given(s3Uploader.download(OBJECT_KEY)).willReturn(excel(rows));
+        given(s3Uploader.download(OBJECT_KEY)).willReturn(excel(headers, rows));
         lenient().when(fileRepository.markConfirmed(FILE_ID)).thenReturn(1);
     }
 
-    private byte[] excel(List<List<String>> rows) throws IOException {
+    private byte[] excel(List<String> headers, List<List<String>> rows) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet();
-            writeRow(sheet.createRow(0), HEADERS);
+            writeRow(sheet.createRow(0), headers);
             for (int i = 0; i < rows.size(); i++) {
                 writeRow(sheet.createRow(i + 1), rows.get(i));
             }
@@ -186,6 +254,15 @@ class MappingConfirmServiceTest {
                 new ColumnMapping("생년월일", "birthDate"),
                 new ColumnMapping("성별", "gender"),
                 new ColumnMapping("채용일", "hireDate")), true);
+    }
+
+    private MappingConfirmRequest confirmRequestWithDepartment() {
+        return new MappingConfirmRequest(List.of(
+                new ColumnMapping("성명", "name"),
+                new ColumnMapping("생년월일", "birthDate"),
+                new ColumnMapping("성별", "gender"),
+                new ColumnMapping("채용일", "hireDate"),
+                new ColumnMapping("근무부서", "department")), true);
     }
 
     @SuppressWarnings("unchecked")
