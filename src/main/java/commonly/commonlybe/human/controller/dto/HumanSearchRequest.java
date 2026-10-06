@@ -1,15 +1,15 @@
 package commonly.commonlybe.human.controller.dto;
 
+import commonly.commonlybe.global.page.PageNumber;
 import commonly.commonlybe.human.entity.Gender;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
 import java.time.LocalDate;
 
 /**
  * 모든 조건은 nullable이며 null이면 해당 조건을 적용하지 않는다.
- * page/size는 명세에 없어 기본값(0, 20)으로 채운다.
+ * page/size는 명세에 없어 기본값(1, 20)으로 채운다. page는 1부터 센다.
  */
 public record HumanSearchRequest(
         String name,
@@ -17,10 +17,10 @@ public record HumanSearchRequest(
         LocalDate birthDateFrom,
         LocalDate birthDateTo,
         String address,
-        @PositiveOrZero Integer page,
+        @Positive Integer page,
         @Positive @Max(100) Integer size
 ) {
-    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_PAGE = PageNumber.FIRST;
     private static final int DEFAULT_SIZE = 20;
 
     public HumanSearchRequest {

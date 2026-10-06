@@ -3,7 +3,8 @@ package commonly.commonlybe.human.controller;
 import commonly.commonlybe.human.controller.dto.HumanCreateRequest;
 import commonly.commonlybe.human.controller.dto.HumanCreateResponse;
 import commonly.commonlybe.human.controller.dto.HumanSearchRequest;
-import commonly.commonlybe.human.controller.dto.HumanSearchResponse;
+import commonly.commonlybe.global.page.PageResponse;
+import commonly.commonlybe.human.controller.dto.HumanDto;
 import commonly.commonlybe.human.controller.dto.HumanUpdateRequest;
 import commonly.commonlybe.human.service.HumanService;
 import jakarta.validation.Valid;
@@ -44,7 +45,7 @@ public class HumanController {
     }
 
     @PostMapping("/search")
-    public HumanSearchResponse search(@RequestBody @Valid HumanSearchRequest request) {
+    public PageResponse<HumanDto> search(@RequestBody @Valid HumanSearchRequest request) {
         return humanService.search(request);
     }
 }

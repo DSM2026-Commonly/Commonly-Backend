@@ -4,9 +4,9 @@ import commonly.commonlybe.certificate.controller.dto.IssuanceHistoryResponse;
 import commonly.commonlybe.certificate.repository.CertificateIssuedRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
+import commonly.commonlybe.global.page.PageNumber;
+import commonly.commonlybe.global.page.PageResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +20,13 @@ public class QueryIssuanceHistoryService {
     private final CertificateIssuedRepository certificateIssuedRepository;
 
     @Transactional(readOnly = true)
-    public List<IssuanceHistoryResponse> execute(int page, int size, LocalDate startDate,
-                                                 LocalDate endDate, String keyword) {
-        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
+    public PageResponse<IssuanceHistoryResponse> execute(int page, int size, LocalDate startDate,
+                                                         LocalDate endDate, String keyword) {
+        Pageable pageable = PageNumber.toPageable(page, size);
         LocalDateTime start = (startDate == null ? MIN_DATE : startDate).atStartOfDay();
         LocalDateTime end = (endDate == null ? MAX_DATE : endDate.plusDays(1)).atStartOfDay();
 
-        return certificateIssuedRepository
-            .searchHistories(keyword == null ? "" : keyword, start, end, pageable)
-            .getContent();
+        return PageResponse.from(certificateIssuedRepository
+            .searchHistories(keyword == null ? "" : keyword, start, end, pageable));
     }
 }
