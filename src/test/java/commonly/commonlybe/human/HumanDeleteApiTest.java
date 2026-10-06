@@ -20,7 +20,9 @@ import commonly.commonlybe.user.entity.User;
 import commonly.commonlybe.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +52,30 @@ class HumanDeleteApiTest {
 
     private String staffToken;
 
+    /**
+     * 테스트 DB가 JVM 전체에서 하나다(`jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1`).
+     * 이 클래스가 남긴 행은 다른 테스트 클래스의 목록 조회 결과에 그대로 끼어든다.
+     * 특히 아래 발급 건은 issuedAt이 기존 픽스처보다 최신이라 발급 이력 1페이지 맨 앞을 차지해
+     * IssuanceHistoryApiTest를 깨뜨린다. 클래스 실행 순서에 따라 깨지고 말고가 갈리므로
+     * 여기서 만든 것은 여기서 되돌린다.
+     */
+    private final List<Long> createdIssuedIds = new ArrayList<>();
+    private final List<Long> createdCertificateIds = new ArrayList<>();
+    private final List<Long> createdHumanIds = new ArrayList<>();
+
+    @AfterEach
+    void 남긴_픽스처를_되돌린다() {
+        createdIssuedIds.stream().filter(certificateIssuedRepository::existsById)
+                .forEach(certificateIssuedRepository::deleteById);
+        createdCertificateIds.stream().filter(certificateRepository::existsById)
+                .forEach(certificateRepository::deleteById);
+        createdHumanIds.stream().filter(humanRepository::existsById)
+                .forEach(humanRepository::deleteById);
+        createdIssuedIds.clear();
+        createdCertificateIds.clear();
+        createdHumanIds.clear();
+    }
+
     @BeforeEach
     void setUp() throws Exception {
         if (userRepository.findByAccountId("delstaff").isEmpty()) {
@@ -72,7 +98,7 @@ class HumanDeleteApiTest {
 
     @Test
     void 연결된_데이터가_없으면_204로_삭제된다() throws Exception {
-        HumanEntity human = humanRepository.save(human("삭제가능자", LocalDate.of(1991, 1, 11)));
+        HumanEntity human = saveHuman(human("삭제가능자", LocalDate.of(1991, 1, 11)));
 
         mockMvc.perform(delete("/api/human/" + human.getHumanId())
                         .header("Authorization", "Bearer " + staffToken))
@@ -83,13 +109,13 @@ class HumanDeleteApiTest {
 
     @Test
     void 재직_이력이_있으면_409와_HUMAN_HAS_CERTIFICATE를_준다() throws Exception {
-        HumanEntity human = humanRepository.save(human("재직이력보유자", LocalDate.of(1992, 2, 22)));
-        certificateRepository.save(CertificateEntity.builder()
+        HumanEntity human = saveHuman(human("재직이력보유자", LocalDate.of(1992, 2, 22)));
+        trackCertificate(certificateRepository.save(CertificateEntity.builder()
                 .humanId(human.getHumanId()).name(human.getName())
                 .birthDate(human.getBirthDate())
                 .gender(commonly.commonlybe.certificate.entity.Gender.MALE)
                 .division("채용").hireDate(LocalDate.of(2024, 3, 1))
-                .build());
+                .build()));
 
         mockMvc.perform(delete("/api/human/" + human.getHumanId())
                         .header("Authorization", "Bearer " + staffToken))
@@ -105,8 +131,8 @@ class HumanDeleteApiTest {
      */
     @Test
     void 발급_건이_있으면_409를_주고_인적사항과_발급_건이_그대로_남는다() throws Exception {
-        HumanEntity human = humanRepository.save(human("발급이력보유자", LocalDate.of(1993, 3, 23)));
-        CertificateIssuedEntity issued = certificateIssuedRepository.save(CertificateIssuedEntity.builder()
+        HumanEntity human = saveHuman(human("발급이력보유자", LocalDate.of(1993, 3, 23)));
+        CertificateIssuedEntity issued = saveIssued(CertificateIssuedEntity.builder()
                 .humanId(human.getHumanId()).documentNo("유성구-2026-064001")
                 .purpose("은행 제출").totalMonths(12).totalDays(0)
                 .issuedAt(LocalDateTime.of(2026, 9, 1, 9, 0))
@@ -120,6 +146,23 @@ class HumanDeleteApiTest {
 
         assertThat(humanRepository.existsById(human.getHumanId())).isTrue();
         assertThat(certificateIssuedRepository.existsById(issued.getCertificateIssuedId())).isTrue();
+    }
+
+    private HumanEntity saveHuman(HumanEntity human) {
+        HumanEntity saved = humanRepository.save(human);
+        createdHumanIds.add(saved.getHumanId());
+        return saved;
+    }
+
+    private CertificateEntity trackCertificate(CertificateEntity saved) {
+        createdCertificateIds.add(saved.getCertificateId());
+        return saved;
+    }
+
+    private CertificateIssuedEntity saveIssued(CertificateIssuedEntity issued) {
+        CertificateIssuedEntity saved = certificateIssuedRepository.save(issued);
+        createdIssuedIds.add(saved.getCertificateIssuedId());
+        return saved;
     }
 
     private HumanEntity human(String name, LocalDate birthDate) {
