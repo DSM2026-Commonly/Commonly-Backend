@@ -48,4 +48,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 운영(Dockerfile ENV TZ)과 같은 시간대로 띄운다. 개발 머신 설정에 따라
+    // 날짜 테스트 결과가 달라지는 것을 막는다.
+    jvmArgs '-Duser.timezone=Asia/Seoul'
 }
